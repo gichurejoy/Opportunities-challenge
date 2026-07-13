@@ -1,0 +1,6 @@
+{
+  "name": "1000 Opportunities",
+  "description": "A personal growth system built around the philosophy that success is measured by the number of opportunities you actively create. Track opportunities, manage pipelines, analyze conversion rates, and get inspired with smart recommendations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

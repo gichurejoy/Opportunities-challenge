@@ -1,0 +1,66 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400..900;1,400..900&family=Lora:ital,wght@0,400..700;1,400..700&family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", "Lora", Georgia, serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  --color-cream-50: #fdfbf7;
+  --color-cream-100: #faf6f0;
+  --color-cream-150: #f4eee1;
+  --color-cream-200: #ebe4d5;
+  --color-cream-300: #dfd5c0;
+  --color-cream-400: #cbbba1;
+  
+  --color-sepia-950: #0f0e0d;
+  --color-sepia-900: #161513;
+  --color-sepia-800: #1e1d1b;
+  --color-sepia-750: #262422;
+  --color-sepia-700: #35322f;
+  --color-sepia-600: #494541;
+  --color-sepia-500: #6a645e;
+  --color-sepia-400: #938c82;
+  --color-sepia-300: #bcb5a9;
+  --color-sepia-200: #dcd7cc;
+  --color-sepia-100: #eae6df;
+  --color-sepia-50: #f3f0ea;
+
+  --color-readflow-green: #1b3d22;
+  --color-readflow-olive: #3f5d45;
+  --color-readflow-gold: #c29543;
+}
+
+.bg-noise {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)' opacity='0.05'/%3E%3C/svg%3E");
+}
+
+.shadow-beautiful {
+  box-shadow: 0px 0px 0px 1px rgba(0,0,0,0.06),
+              0px 1px 1px -0.5px rgba(0,0,0,0.06),
+              0px 3px 3px -1.5px rgba(0,0,0,0.06),
+              0px 6px 6px -3px rgba(0,0,0,0.06),
+              0px 12px 12px -6px rgba(0,0,0,0.06),
+              0px 24px 24px -12px rgba(0,0,0,0.06);
+}
+
+.shadow-book {
+  box-shadow: -2px 0 2px 0 rgba(0,0,0,0.1) inset,
+              0px 4px 8px -2px rgba(0,0,0,0.1),
+              0px 8px 16px -4px rgba(0,0,0,0.1);
+}
+
+body {
+  background-color: var(--color-cream-100);
+  color: var(--color-sepia-900);
+  font-family: var(--font-sans);
+  transition-property: background-color, border-color, text-color, fill, stroke;
+  transition-duration: 300ms;
+}
+
+.dark body {
+  background-color: var(--color-sepia-950);
+  color: var(--color-sepia-100);
+}
