@@ -1,7 +1,7 @@
 # 1,000 Opportunities Challenge
 
 <div align="center">
-  <img width="1200" height="475" alt="1000 Opportunities Challenge" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+  <img width="1200" height="475" alt="1000 Opportunities Challenge" src="" />
 </div>
 
 > **Core Philosophy:** Your life changes when the number of proactive opportunities you create exceeds the number you wait for.
