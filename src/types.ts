@@ -11,6 +11,7 @@ export interface Opportunity {
   type: string;
   points: number;
   timestamp: string; // ISO string
+  companyOrClient?: string;
   isSystemSuggestion?: boolean;
   feedback?: string;
   stage?: string;
@@ -81,6 +82,18 @@ export interface StreakState {
   currentStreak: number;
   longestStreak: number;
   lastActiveDate?: string; // YYYY-MM-DD
+  shieldActive?: boolean;
+}
+
+export interface AchievementBadge {
+  id: string;
+  title: string;
+  description: string;
+  category: string;
+  iconName: string;
+  unlockedAt?: string;
+  isUnlocked: boolean;
+  progress: number; // 0-100
 }
 
 export interface WeeklyTarget {
@@ -110,3 +123,4 @@ export interface NudgeConfig {
   schedules: NudgeSchedule[];
   history: NudgeLog[];
 }
+

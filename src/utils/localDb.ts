@@ -27,15 +27,15 @@ export interface AppState {
   nudgeConfig?: NudgeConfig;
 }
 
-// Helper to get dates relative to today (2026-07-09)
+// Helper to get dates relative to today (dynamic)
 function getRelativeDateString(daysOffset: number): string {
-  const date = new Date('2026-07-09T10:00:00-07:00');
+  const date = new Date();
   date.setDate(date.getDate() + daysOffset);
   return date.toISOString();
 }
 
 function getRelativeDateOnly(daysOffset: number): string {
-  const date = new Date('2026-07-09T10:00:00-07:00');
+  const date = new Date();
   date.setDate(date.getDate() + daysOffset);
   return date.toISOString().split('T')[0];
 }
@@ -110,149 +110,15 @@ export const INITIAL_STREAKS: StreakConfig[] = [
   { id: 'coding', name: '🚀 Coding Streak', type: 'coding', isActive: true },
 ];
 
-export const INITIAL_VISIONS: Vision[] = [
-  {
-    id: 'vision-1',
-    title: 'Become Senior Software Engineer',
-    description: 'Advance technical leadership, contribute to open-source, and launch 3 production-ready web applications.',
-    targetPoints: 500,
-    completedPoints: 315, // 63%
-    supportingCategories: ['Career', 'Learning', 'Side Projects'],
-    supportingTypes: ['Job Application', 'Practice Coding', 'Complete Course', 'Build Mini Project', 'Commit Code', 'Portfolio Update'],
-    isCompleted: false,
-  },
-  {
-    id: 'vision-2',
-    title: 'Establish Organic Farm Project',
-    description: 'Secure farm plot, buy necessary planting tools, save for greenhouse equipment, and run first commercial harvest cycle.',
-    targetPoints: 200,
-    completedPoints: 70, // 35%
-    supportingCategories: ['Farming', 'Finance'],
-    supportingTypes: ['Farm Visit', 'Save for Farm', 'Buy Equipment', 'Plant', 'Harvest', 'Saved Money'],
-    isCompleted: false,
-  },
-  {
-    id: 'vision-3',
-    title: 'Build Profitable Solopreneur Business',
-    description: 'Create passive income streams by closing 3 design/development agency retainer clients.',
-    targetPoints: 300,
-    completedPoints: 120, // 40%
-    supportingCategories: ['Business', 'Side Projects'],
-    supportingTypes: ['Cold Email', 'Proposal Sent', 'Sales Call', 'Client Won', 'Demo Call', 'Follow-up', 'Deploy Feature'],
-    isCompleted: false,
-  }
-];
+export const INITIAL_VISIONS: Vision[] = [];
 
-export const INITIAL_PIPELINES: OpportunityPipeline[] = [
-  {
-    id: 'pipe-1',
-    title: 'Enterprise Client Proposal - Acme Corp',
-    type: 'Business',
-    stages: [
-      { name: 'Created', completedAt: getRelativeDateString(-15) },
-      { name: 'Sent', completedAt: getRelativeDateString(-14) },
-      { name: 'Waiting', completedAt: getRelativeDateString(-14) },
-      { name: 'Meeting Scheduled', completedAt: getRelativeDateString(-8) },
-      { name: 'Negotiation' },
-      { name: 'Won 🎉' },
-    ],
-    currentStageIndex: 3,
-    status: 'active',
-    notes: 'Pitch went great. Followed up on budget expectations. Meeting scheduled to discuss SLA requirements.',
-    category: 'Business',
-    createdAt: getRelativeDateString(-15),
-    updatedAt: getRelativeDateString(-8),
-  },
-  {
-    id: 'pipe-2',
-    title: 'Senior Frontend Role - Microsoft',
-    type: 'Job',
-    stages: [
-      { name: 'Applied', completedAt: getRelativeDateString(-22) },
-      { name: 'Assessment', completedAt: getRelativeDateString(-15) },
-      { name: 'Interview', completedAt: getRelativeDateString(-2) },
-      { name: 'Offer' },
-    ],
-    currentStageIndex: 2,
-    status: 'active',
-    notes: 'Finished technical design and system interview. Recruiter mentioned positive early feedback, awaiting formal debrief.',
-    category: 'Career',
-    createdAt: getRelativeDateString(-22),
-    updatedAt: getRelativeDateString(-2),
-  },
-  {
-    id: 'pipe-3',
-    title: 'East African Agri-Tech Scholarship',
-    type: 'Scholarship',
-    stages: [
-      { name: 'Submitted', completedAt: getRelativeDateString(-30) },
-      { name: 'Review', completedAt: getRelativeDateString(-10) },
-      { name: 'Interview' },
-      { name: 'Accepted' },
-    ],
-    currentStageIndex: 1,
-    status: 'active',
-    notes: 'Submitted cover letter focusing on farming automation. Application under committee review.',
-    category: 'Career',
-    createdAt: getRelativeDateString(-30),
-    updatedAt: getRelativeDateString(-10),
-  },
-];
+export const INITIAL_PIPELINES: OpportunityPipeline[] = [];
 
-// Rich set of pre-seeded historical logs for the calendar heatmap
 export function generateInitialOpportunities(): Opportunity[] {
-  const list: Opportunity[] = [];
-  
-  // Seed today's opportunities (July 9, 2026)
-  list.push(
-    { id: 'opp-t1', title: 'Applied to Microsoft', category: 'Career', type: 'Job Application', points: 5, timestamp: getRelativeDateString(0) },
-    { id: 'opp-t2', title: 'Messaged CEO regarding integration proposal', category: 'Business', type: 'Cold Email', points: 4, timestamp: getRelativeDateString(0) },
-    { id: 'opp-t3', title: 'Published LinkedIn post on building in public', category: 'Side Projects', type: 'Publish Blog', points: 4, timestamp: getRelativeDateString(0) },
-    { id: 'opp-t4', title: 'Built responsive landing page demo', category: 'Side Projects', type: 'Build Mini Project', points: 8, timestamp: getRelativeDateString(0) },
-  );
-
-  // Seed opportunities for past 12 weeks to populate calendar heatmap
-  // Let's create opportunities on random days
-  const startDay = -84; // 12 weeks ago
-  let count = 100;
-  
-  // Loop backward and seed random points
-  for (let i = startDay; i < 0; i++) {
-    const isWeekend = new Date(getRelativeDateString(i)).getDay() % 6 === 0;
-    const logChance = isWeekend ? 0.4 : 0.7; // higher chance on weekdays
-    
-    if (Math.random() < logChance) {
-      const numOpps = Math.floor(Math.random() * 3) + 1; // 1 to 3 opportunities
-      for (let j = 0; j < numOpps; j++) {
-        const categories = Object.keys(DEFAULT_SCORE_CONFIG);
-        const category = categories[Math.floor(Math.random() * categories.length)];
-        const types = Object.keys(DEFAULT_SCORE_CONFIG[category]);
-        const type = types[Math.floor(Math.random() * types.length)];
-        const points = DEFAULT_SCORE_CONFIG[category][type] || 1;
-        
-        list.push({
-          id: `opp-seed-${count++}`,
-          title: `Completed ${type.toLowerCase()} effort`,
-          category,
-          type,
-          points,
-          timestamp: getRelativeDateString(i),
-        });
-      }
-    }
-  }
-
-  return list;
+  return [];
 }
 
-export const DEFAULT_CHECKLIST_HABITS: ChecklistHabit[] = [
-  { id: 'hab-1', title: 'Apply to a job', category: 'Career', type: 'Job Application', points: 5 },
-  { id: 'hab-2', title: 'Practice coding', category: 'Learning', type: 'Practice Coding', points: 3 },
-  { id: 'hab-3', title: 'Read 20 pages', category: 'Learning', type: 'Read 20 pages', points: 1 },
-  { id: 'hab-4', title: 'Do a workout', category: 'Health', type: 'Workout', points: 1 },
-  { id: 'hab-5', title: 'Commit code', category: 'Side Projects', type: 'Commit Code', points: 2 },
-  { id: 'hab-6', title: 'Send cold outreach email', category: 'Business', type: 'Cold Email', points: 4 },
-];
+export const DEFAULT_CHECKLIST_HABITS: ChecklistHabit[] = [];
 
 const DEFAULT_NUDGE_CONFIG: NudgeConfig = {
   enabled: true,
@@ -263,10 +129,7 @@ const DEFAULT_NUDGE_CONFIG: NudgeConfig = {
     { id: 'nudge-2', time: '14:00', enabled: true, message: "What's one more opportunity you can create today?" },
     { id: 'nudge-3', time: '19:00', enabled: true, message: "What's one more opportunity you can create today?" },
   ],
-  history: [
-    { id: 'log-1', timestamp: new Date(Date.now() - 3600000 * 24).toISOString(), message: "What's one more opportunity you can create today?", actionTaken: true },
-    { id: 'log-2', timestamp: new Date(Date.now() - 3600000 * 6).toISOString(), message: "What's one more opportunity you can create today?", actionTaken: false },
-  ]
+  history: []
 };
 
 const STORAGE_KEY = '1000_opportunities_app_state';
@@ -283,31 +146,57 @@ export const localDb = {
         if (!parsed.nudgeConfig) {
           parsed.nudgeConfig = DEFAULT_NUDGE_CONFIG;
         }
+        // Purge legacy hardcoded seed data from browser localStorage
+        if (Array.isArray(parsed.opportunities)) {
+          parsed.opportunities = parsed.opportunities.filter(
+            (o: any) => !o.id.startsWith('opp-seed-') && !o.id.startsWith('opp-t')
+          );
+        }
+        if (Array.isArray(parsed.pipelines)) {
+          parsed.pipelines = parsed.pipelines.filter(
+            (p: any) => !p.id.startsWith('pipe-')
+          );
+        }
+        if (Array.isArray(parsed.visions)) {
+          parsed.visions = parsed.visions.filter(
+            (v: any) => !v.id.startsWith('vision-')
+          );
+        }
+        if (Array.isArray(parsed.checklistHabits)) {
+          parsed.checklistHabits = parsed.checklistHabits.filter(
+            (h: any) => !h.id.startsWith('hab-')
+          );
+        }
+        if (parsed.streakStates && (parsed.streakStates.opportunity?.currentStreak === 6 || parsed.streakStates.reading?.currentStreak === 12)) {
+          parsed.streakStates = {
+            opportunity: { currentStreak: 0, longestStreak: 0 },
+            reading: { currentStreak: 0, longestStreak: 0 },
+            savings: { currentStreak: 0, longestStreak: 0 },
+            fitness: { currentStreak: 0, longestStreak: 0 },
+            coding: { currentStreak: 0, longestStreak: 0 },
+          };
+        }
         return parsed;
       }
     } catch (e) {
       console.error('Failed to load state from localStorage', e);
     }
 
-    // Default pre-seeded state
+    // Default clean state for new user
     const defaultState: AppState = {
-      opportunities: generateInitialOpportunities(),
-      pipelines: INITIAL_PIPELINES,
+      opportunities: [],
+      pipelines: [],
       scoreConfig: DEFAULT_SCORE_CONFIG,
-      visions: INITIAL_VISIONS,
+      visions: [],
       streaks: INITIAL_STREAKS,
       streakStates: {
-        opportunity: { currentStreak: 6, longestStreak: 15, lastActiveDate: getRelativeDateOnly(0) },
-        reading: { currentStreak: 12, longestStreak: 20, lastActiveDate: getRelativeDateOnly(0) },
-        savings: { currentStreak: 3, longestStreak: 8, lastActiveDate: getRelativeDateOnly(-1) },
-        fitness: { currentStreak: 5, longestStreak: 10, lastActiveDate: getRelativeDateOnly(0) },
-        coding: { currentStreak: 8, longestStreak: 12, lastActiveDate: getRelativeDateOnly(0) },
+        opportunity: { currentStreak: 0, longestStreak: 0 },
+        reading: { currentStreak: 0, longestStreak: 0 },
+        savings: { currentStreak: 0, longestStreak: 0 },
+        fitness: { currentStreak: 0, longestStreak: 0 },
+        coding: { currentStreak: 0, longestStreak: 0 },
       },
-      weeklyTargets: [
-        { weekStarting: '2026-07-05', targetCount: 30, completedCount: 22 },
-        { weekStarting: '2026-06-28', targetCount: 25, completedCount: 27 },
-        { weekStarting: '2026-06-21', targetCount: 25, completedCount: 26 },
-      ],
+      weeklyTargets: [],
       checklistHabits: DEFAULT_CHECKLIST_HABITS,
       nudgeConfig: DEFAULT_NUDGE_CONFIG,
     };

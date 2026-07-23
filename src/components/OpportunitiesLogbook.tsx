@@ -19,7 +19,8 @@ import {
   ExternalLink,
   ChevronLeft,
   ChevronRight,
-  MessageSquare
+  MessageSquare,
+  Building
 } from 'lucide-react';
 import { CATEGORY_METADATA } from './QuickLogger';
 
@@ -69,6 +70,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   const [editTitle, setEditTitle] = useState('');
   const [editCategory, setEditCategory] = useState('');
   const [editType, setEditType] = useState('');
+  const [editCompanyOrClient, setEditCompanyOrClient] = useState('');
   const [editPoints, setEditPoints] = useState<number>(0);
   const [editFeedback, setEditFeedback] = useState('');
   const [editStage, setEditStage] = useState('');
@@ -87,6 +89,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   // Filtered and sorted opportunities
   const filteredOpps = opportunities.filter((opp) => {
     const matchesSearch = opp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          (opp.companyOrClient && opp.companyOrClient.toLowerCase().includes(searchQuery.toLowerCase())) ||
                           (opp.type && opp.type.toLowerCase().includes(searchQuery.toLowerCase())) ||
                           (opp.description && opp.description.toLowerCase().includes(searchQuery.toLowerCase()));
     
@@ -128,9 +131,10 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
 
   // Export Opportunities progress to a local CSV backup file
   const exportToCSV = () => {
-    const headers = ['Title', 'Category', 'Subtype/Tag', 'Score Points', 'Stage Status', 'Qualitative Notes/Feedback', 'Logged Date', 'Linked Vision/Goal ID'];
+    const headers = ['Title', 'Target Company/Client', 'Category', 'Subtype/Tag', 'Score Points', 'Stage Status', 'Qualitative Notes/Feedback', 'Logged Date', 'Linked Vision/Goal ID'];
     const rows = opportunities.map(opp => [
       `"${opp.title.replace(/"/g, '""')}"`,
+      `"${(opp.companyOrClient || '').replace(/"/g, '""')}"`,
       `"${opp.category}"`,
       `"${(opp.type || '').replace(/"/g, '""')}"`,
       opp.points,
@@ -158,6 +162,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
     setEditTitle(opp.title);
     setEditCategory(opp.category);
     setEditType(opp.type);
+    setEditCompanyOrClient(opp.companyOrClient || '');
     setEditPoints(opp.points);
     setEditFeedback(opp.feedback || '');
     setEditStage(opp.stage || 'Sourced');
@@ -180,6 +185,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
       title: editTitle.trim(),
       category: editCategory,
       type: editType.trim(),
+      companyOrClient: editCompanyOrClient.trim() || undefined,
       points: editPoints,
       feedback: editFeedback.trim(),
       stage: editStage,
@@ -400,7 +406,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
               onClick={onNavigateToDashboard}
               className="flex items-center gap-1.5 px-4 py-2 bg-cream-100 hover:bg-cream-150 dark:bg-sepia-800 dark:hover:bg-sepia-750 text-sepia-800 dark:text-cream-200 text-xs font-bold rounded-lg transition-all cursor-pointer"
             >
-              ← View Bento Dashboard
+              ← View Dashboard
             </button>
           </div>
         </div>
@@ -508,6 +514,17 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                               type="text"
                               value={editTitle}
                               onChange={(e) => setEditTitle(e.target.value)}
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Target Company / Client</label>
+                            <input
+                              id={`page-edit-company-${opp.id}`}
+                              type="text"
+                              value={editCompanyOrClient}
+                              onChange={(e) => setEditCompanyOrClient(e.target.value)}
+                              placeholder="e.g. Google, Acme Corp, Client John"
                               className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
                             />
                           </div>
@@ -645,6 +662,14 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                           <span>•</span>
                           <span>{new Date(opp.timestamp).toLocaleDateString()}</span>
                         </div>
+                        {opp.companyOrClient && (
+                          <div className="mt-1 text-[10px] text-amber-800 dark:text-amber-300 font-semibold flex items-center gap-1 font-sans">
+                            <Building className="w-3 h-3 text-amber-600 shrink-0" />
+                            <span className="truncate max-w-[200px]" title={opp.companyOrClient}>
+                              {opp.companyOrClient}
+                            </span>
+                          </div>
+                        )}
                         {opp.linkedVisionId && (
                           <div className="mt-1 text-[10px] text-readflow-green dark:text-readflow-lightgreen font-bold flex items-center gap-1 font-sans">
                             <TrendingUp className="w-3 h-3 text-readflow-green/80" />

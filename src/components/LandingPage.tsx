@@ -224,16 +224,10 @@ export const LandingPage: React.FC<LandingPageProps> = ({
               </button>
               <button 
                 onClick={onEnterApp}
-                className="text-sm font-medium hover:text-stone-900 dark:hover:text-cream-50 transition-colors text-stone-500 dark:text-cream-300 hidden sm:block cursor-pointer"
-              >
-                Launch Dashboard
-              </button>
-              <button 
-                onClick={onEnterApp}
                 className="group relative px-5 py-2 bg-stone-900 dark:bg-readflow-green text-white rounded-full text-sm font-medium hover:bg-stone-800 dark:hover:bg-readflow-olive transition-all hover:shadow-lg hover:-translate-y-0.5 cursor-pointer"
               >
                 <span className="relative z-10 flex items-center gap-1.5">
-                  Enter Tracker ({totalOppsCount})
+                  Sign In / Create Account
                   <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" />
                 </span>
               </button>
@@ -341,7 +335,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 <div className="absolute inset-0 w-full h-full bg-gradient-to-r from-stone-850 to-stone-950 dark:from-readflow-green dark:to-readflow-olive"></div>
                 <div className="absolute bottom-0 left-0 w-full h-full bg-gradient-to-t from-readflow-gold/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <span className="relative z-10 flex items-center gap-2 font-serif">
-                  Start the Challenge
+                  Sign In to Start Challenge
                   <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                 </span>
               </button>
@@ -350,7 +344,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                 onClick={onEnterApp}
                 className="inline-flex items-center gap-2 px-8 py-3.5 rounded-full bg-white dark:bg-sepia-900 text-stone-600 dark:text-cream-200 border border-stone-200 dark:border-sepia-800 text-base font-medium hover:border-readflow-gold hover:text-readflow-green dark:hover:text-readflow-gold hover:bg-stone-50/50 transition-all hover:-translate-y-1 shadow-sm cursor-pointer"
               >
-                <span>Launch App</span>
+                <span>Create Account</span>
                 <ExternalLink className="w-4 h-4 opacity-60" />
               </button>
             </div>
@@ -532,7 +526,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                   <div className="absolute left-6 md:left-1/2 -translate-x-1/2 w-4 h-4 rounded-full bg-white dark:bg-sepia-900 border-4 border-readflow-gold z-10 shadow-sm"></div>
                   <div className="md:w-1/2 md:pl-12 order-3 md:order-2">
                     <h4 className="text-lg font-medium text-stone-900 dark:text-cream-100">Track Pipeline Conversion</h4>
-                    <p className="text-sm text-stone-600 dark:text-cream-300 mt-1">Review weekly bento dashboard metrics, streak milestones, and balance charts.</p>
+                    <p className="text-sm text-stone-600 dark:text-cream-300 mt-1">Review weekly dashboard metrics, streak milestones, and balance charts.</p>
                   </div>
                 </div>
               </div>
@@ -571,7 +565,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
           </div>
         </section>
 
-        {/* Final CTA / Interactive Seed Sandbox */}
+        {/* Final CTA / Interactive Seed Trial */}
         <section className="py-20 text-center relative overflow-hidden bg-stone-900 dark:bg-sepia-900">
           <div className="absolute inset-0 opacity-10 bg-noise z-0 pointer-events-none"></div>
           
@@ -640,7 +634,7 @@ export const LandingPage: React.FC<LandingPageProps> = ({
                       type="submit"
                       className="w-full bg-readflow-green hover:bg-readflow-olive text-white px-4 py-2.5 rounded font-medium transition-colors text-xs cursor-pointer h-[38px] flex items-center justify-center gap-1"
                     >
-                      Log Sandbox Seed
+                      Log Seed Action
                       <ChevronRight className="w-3.5 h-3.5 text-readflow-gold" />
                     </button>
                   </div>

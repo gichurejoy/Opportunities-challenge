@@ -64,6 +64,7 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('Career');
   const [simpleTitle, setSimpleTitle] = useState<string>('');
+  const [companyOrClient, setCompanyOrClient] = useState<string>('');
   const [customTitle, setCustomTitle] = useState<string>('');
   const [customPoints, setCustomPoints] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<'simple' | 'preset' | 'custom' | 'checklist'>('simple');
@@ -87,10 +88,12 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
       category: selectedCategory,
       type: 'Direct Input',
       points: firstPresetPoints,
+      companyOrClient: companyOrClient.trim() || undefined,
       linkedVisionId: selectedVisionId || undefined,
     });
 
     setSimpleTitle('');
+    setCompanyOrClient('');
     setSelectedVisionId('');
   };
 
@@ -100,8 +103,10 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
       category: selectedCategory,
       type,
       points,
+      companyOrClient: companyOrClient.trim() || undefined,
       linkedVisionId: selectedVisionId || undefined,
     });
+    setCompanyOrClient('');
     setSelectedVisionId('');
   };
 
@@ -114,11 +119,13 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
       category: selectedCategory,
       type: 'Custom Initiative',
       points: customPoints || 1,
+      companyOrClient: companyOrClient.trim() || undefined,
       linkedVisionId: selectedVisionId || undefined,
     });
 
     setCustomTitle('');
     setCustomPoints(0);
+    setCompanyOrClient('');
     setSelectedVisionId('');
   };
 
@@ -266,6 +273,20 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
                 onChange={(e) => setSimpleTitle(e.target.value)}
                 placeholder={`e.g., Messaged senior recruiter about the ${selectedCategory} opening, or read 10 pages...`}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen resize-none font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
+                Target Company / Client / Institution (Optional)
+              </label>
+              <input
+                id="simple-company-input"
+                type="text"
+                value={companyOrClient}
+                onChange={(e) => setCompanyOrClient(e.target.value)}
+                placeholder="e.g. Acme Corp, Microsoft, Client John, Stanford"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
               />
             </div>
 

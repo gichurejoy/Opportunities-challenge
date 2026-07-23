@@ -14,7 +14,7 @@ interface HeatmapProps {
 export const Heatmap: React.FC<HeatmapProps> = ({ opportunities }) => {
   // Let's build a grid representing the past 22 weeks, ending on the current week.
   const gridData = useMemo(() => {
-    const today = new Date('2026-07-09T12:00:00-07:00');
+    const today = new Date();
     
     // Find the starting Sunday of 22 weeks ago
     // 22 weeks * 7 days = 154 days
@@ -64,7 +64,7 @@ export const Heatmap: React.FC<HeatmapProps> = ({ opportunities }) => {
       tempDate.setDate(tempDate.getDate() + 1);
     }
 
-    return { weeks, startDate, endDate };
+    return { weeks, startDate, endDate, today };
   }, [opportunities]);
 
   const { weeks } = gridData;
@@ -114,7 +114,26 @@ export const Heatmap: React.FC<HeatmapProps> = ({ opportunities }) => {
                   const count = day.info?.count || 0;
                   const pts = day.info?.points || 0;
                   const list = day.info?.titles || [];
-                  const isFuture = day.date > new Date('2026-07-09T23:59:59-07:00');
+                  const todayMidnight = new Date(gridData.today.getFullYear(), gridData.today.getMonth(), gridData.today.getDate(), 23, 59, 59);
+                  const isFuture = day.date > todayMidnight;
+
+                  const isTopRow = day.dayOfWeek <= 2;
+                  const isRightEdge = weekIdx >= weeks.length - 4;
+                  const isLeftEdge = weekIdx < 3;
+
+                  const tooltipVertClass = isTopRow ? 'top-full mt-2' : 'bottom-full mb-2';
+                  const tooltipHorizClass = isRightEdge 
+                    ? 'right-0' 
+                    : isLeftEdge 
+                    ? 'left-0' 
+                    : 'left-1/2 -translate-x-1/2';
+
+                  const arrowVertClass = isTopRow ? '-top-2 rotate-180' : 'top-full';
+                  const arrowHorizClass = isRightEdge 
+                    ? 'right-2' 
+                    : isLeftEdge 
+                    ? 'left-2' 
+                    : 'left-1/2 -translate-x-1/2';
 
                   return (
                     <div
@@ -124,8 +143,8 @@ export const Heatmap: React.FC<HeatmapProps> = ({ opportunities }) => {
                         isFuture ? 'bg-cream-50 dark:bg-sepia-950 border border-dashed border-cream-200 dark:border-sepia-800' : getIntensityClass(count)
                       }`}
                     >
-                      {/* Interactive Custom Tooltip on hover */}
-                      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 w-48 bg-sepia-950 text-cream-50 rounded-lg p-2.5 text-[10px] leading-relaxed shadow-xl hidden group-hover:block z-30 pointer-events-none border border-sepia-800">
+                      {/* Interactive Custom Tooltip on hover with smart positioning */}
+                      <div className={`absolute ${tooltipVertClass} ${tooltipHorizClass} w-48 bg-sepia-950 text-cream-50 rounded-lg p-2.5 text-[10px] leading-relaxed shadow-xl hidden group-hover:block z-30 pointer-events-none border border-sepia-800`}>
                         <div className="font-bold text-cream-200 border-b border-sepia-800 pb-1 mb-1.5 flex justify-between items-center">
                           <span>{day.date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}</span>
                           {hasOpps && <span className="bg-readflow-green text-cream-50 font-bold px-1.5 py-0.2 rounded font-mono">+{pts} pts</span>}
@@ -145,7 +164,7 @@ export const Heatmap: React.FC<HeatmapProps> = ({ opportunities }) => {
                         ) : (
                           <p className="text-sepia-300">0 opportunities created today.</p>
                         )}
-                        <svg className="absolute top-full left-1/2 -translate-x-1/2 text-sepia-950 w-2.5 h-2.5 fill-current" viewBox="0 0 10 10">
+                        <svg className={`absolute ${arrowVertClass} ${arrowHorizClass} text-sepia-950 w-2.5 h-2.5 fill-current`} viewBox="0 0 10 10">
                           <polygon points="5,5 0,0 10,0" />
                         </svg>
                       </div>
@@ -160,11 +179,13 @@ export const Heatmap: React.FC<HeatmapProps> = ({ opportunities }) => {
 
       {/* Legend & Month Markers */}
       <div className="flex items-center justify-between text-[10px] text-sepia-400 border-t border-cream-150 dark:border-sepia-850 pt-3 mt-3">
-        <div className="flex gap-4">
-          <span>April</span>
-          <span>May</span>
-          <span>June</span>
-          <span className="font-semibold text-sepia-700 dark:text-cream-200">July 2026</span>
+        <div className="flex gap-3">
+          <span>{new Date(Date.now() - 90 * 86400000).toLocaleDateString(undefined, { month: 'short' })}</span>
+          <span>{new Date(Date.now() - 60 * 86400000).toLocaleDateString(undefined, { month: 'short' })}</span>
+          <span>{new Date(Date.now() - 30 * 86400000).toLocaleDateString(undefined, { month: 'short' })}</span>
+          <span className="font-semibold text-sepia-700 dark:text-cream-200">
+            {new Date().toLocaleDateString(undefined, { month: 'short', year: 'numeric' })}
+          </span>
         </div>
         <div className="flex items-center gap-1">
           <span>Less</span>

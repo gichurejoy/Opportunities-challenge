@@ -296,7 +296,7 @@ export const NudgeSettings: React.FC<NudgeSettingsProps> = ({
           <div className="mb-5 p-2.5 rounded-lg bg-cream-50/60 dark:bg-sepia-850/20 border border-cream-150 dark:border-sepia-850/40 text-[10px] flex items-start gap-2 text-sepia-700 dark:text-cream-200">
             <AlertCircle className="w-4 h-4 text-readflow-gold shrink-0 mt-0.5" />
             <p className="font-semibold leading-relaxed">
-              <strong>Push Permission:</strong> Click <button onClick={handleRequestPermission} className="underline text-readflow-green dark:text-readflow-lightgreen font-bold hover:text-readflow-olive transition-all cursor-pointer">Engage Push API</button> to allow true background desktop alerts. If denied or inside sandboxed workspace iframes, we automatically trigger a fallback <strong>visual chime widget</strong> in real-time.
+              <strong>Push Permission:</strong> Click <button onClick={handleRequestPermission} className="underline text-readflow-green dark:text-readflow-lightgreen font-bold hover:text-readflow-olive transition-all cursor-pointer">Engage Push API</button> to allow true background desktop alerts. If denied or inside restricted browser iframes, we automatically trigger a fallback <strong>visual chime widget</strong> in real-time.
             </p>
           </div>
         )}

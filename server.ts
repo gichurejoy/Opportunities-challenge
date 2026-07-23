@@ -8,13 +8,23 @@ import path from "path";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
+import { prisma } from "./server/db";
+import {
+  hashPassword,
+  comparePassword,
+  generateToken,
+  verifyGoogleToken,
+  authenticateToken,
+  AuthRequest
+} from "./server/auth";
 
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
 
-app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
+
 
 // Lazy-initialized Gemini client to prevent crashes if key is missing on startup
 let aiInstance: GoogleGenAI | null = null;
@@ -192,6 +202,180 @@ Generate 3 distinct suggestions, each belonging to one of these categories. Ensu
       source: "fallback",
       error: errMessage
     });
+  }
+});
+
+// ==========================================
+// Authentication Routes (Email/Password & Google)
+// ==========================================
+
+// 1. Email/Password Registration
+app.post("/api/auth/register", async (req, res) => {
+  try {
+    const { email, password, name } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    const existingUser = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (existingUser) {
+      return res.status(400).json({ error: "An account with this email already exists" });
+    }
+
+    const passwordHash = await hashPassword(password);
+    const user = await prisma.user.create({
+      data: {
+        email: email.toLowerCase().trim(),
+        name: name || email.split("@")[0],
+        passwordHash,
+      },
+    });
+
+    const token = generateToken({ userId: user.id, email: user.email });
+    return res.json({
+      user: { id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl },
+      token,
+    });
+  } catch (error: any) {
+    console.error("Registration error:", error);
+    return res.status(500).json({ error: error?.message || "Failed to register user" });
+  }
+});
+
+// 2. Email/Password Login
+app.post("/api/auth/login", async (req, res) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ error: "Email and password are required" });
+    }
+
+    const user = await prisma.user.findUnique({ where: { email: email.toLowerCase().trim() } });
+    if (!user || !user.passwordHash) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const isValid = await comparePassword(password, user.passwordHash);
+    if (!isValid) {
+      return res.status(401).json({ error: "Invalid email or password" });
+    }
+
+    const token = generateToken({ userId: user.id, email: user.email });
+    return res.json({
+      user: { id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl },
+      token,
+    });
+  } catch (error: any) {
+    console.error("Login error:", error);
+    return res.status(500).json({ error: error?.message || "Failed to log in" });
+  }
+});
+
+// 3. Google OAuth Login / Sync
+app.post("/api/auth/google", async (req, res) => {
+  try {
+    const { idToken } = req.body;
+    if (!idToken) {
+      return res.status(400).json({ error: "Google ID Token is required" });
+    }
+
+    const googlePayload = await verifyGoogleToken(idToken);
+    if (!googlePayload || !googlePayload.email) {
+      return res.status(401).json({ error: "Invalid or expired Google Token" });
+    }
+
+    const email = googlePayload.email.toLowerCase().trim();
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [{ googleId: googlePayload.sub }, { email: email }],
+      },
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email,
+          name: googlePayload.name || email.split("@")[0],
+          googleId: googlePayload.sub,
+          avatarUrl: googlePayload.picture || null,
+        },
+      });
+    } else if (!user.googleId) {
+      // Link googleId if user previously created account with email
+      user = await prisma.user.update({
+        where: { id: user.id },
+        data: {
+          googleId: googlePayload.sub,
+          avatarUrl: user.avatarUrl || googlePayload.picture || null,
+        },
+      });
+    }
+
+    const token = generateToken({ userId: user.id, email: user.email });
+    return res.json({
+      user: { id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl },
+      token,
+    });
+  } catch (error: any) {
+    console.error("Google Auth error:", error);
+    return res.status(500).json({ error: error?.message || "Failed to authenticate with Google" });
+  }
+});
+
+// 4. Get Logged-in User Profile
+app.get("/api/auth/me", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const user = await prisma.user.findUnique({ where: { id: req.userId } });
+    if (!user) {
+      return res.status(404).json({ error: "User not found" });
+    }
+    return res.json({
+      user: { id: user.id, email: user.email, name: user.name, avatarUrl: user.avatarUrl },
+    });
+  } catch (error: any) {
+    return res.status(500).json({ error: error?.message || "Failed to fetch user" });
+  }
+});
+
+// ==========================================
+// User State Sync Routes (Database Persistence)
+// ==========================================
+
+// 5. Get User Application State
+app.get("/api/state", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const userState = await prisma.userState.findUnique({ where: { userId: req.userId! } });
+    if (!userState) {
+      return res.json({ state: null });
+    }
+    return res.json({ state: JSON.parse(userState.stateJson) });
+  } catch (error: any) {
+    console.error("Error loading user state:", error);
+    return res.status(500).json({ error: "Failed to load state from database" });
+  }
+});
+
+// 6. Save User Application State
+app.post("/api/state", authenticateToken, async (req: AuthRequest, res) => {
+  try {
+    const { state } = req.body;
+    if (!state) {
+      return res.status(400).json({ error: "State content is required" });
+    }
+
+    await prisma.userState.upsert({
+      where: { userId: req.userId! },
+      update: { stateJson: JSON.stringify(state) },
+      create: {
+        userId: req.userId!,
+        stateJson: JSON.stringify(state),
+      },
+    });
+
+    return res.json({ success: true });
+  } catch (error: any) {
+    console.error("Error saving user state:", error);
+    return res.status(500).json({ error: "Failed to save state to database" });
   }
 });
 

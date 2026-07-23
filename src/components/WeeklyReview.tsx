@@ -13,37 +13,59 @@ interface WeeklyReviewProps {
   onUpdateWeeklyTarget: (weekStarting: string, targetCount: number) => void;
 }
 
-const WEEKS = [
-  { date: '2026-07-12', label: 'This Week (Jul 12 - Jul 18)' },
-  { date: '2026-07-05', label: 'Last Week (Jul 5 - Jul 11)' },
-  { date: '2026-06-28', label: '2 Weeks Ago (Jun 28 - Jul 4)' },
-  { date: '2026-06-21', label: '3 Weeks Ago (Jun 21 - Jun 27)' },
-];
-
 export const WeeklyReview: React.FC<WeeklyReviewProps> = ({
   opportunities,
   weeklyTargets,
   onUpdateWeeklyTarget,
 }) => {
   const [activeTab, setActiveTab] = useState<'weekly' | 'monthly'>('weekly');
-  const [selectedMonth, setSelectedMonth] = useState<'June' | 'May'>('June');
-  const [selectedWeekIdx, setSelectedWeekIdx] = useState<number>(1); // Default to Last Week since it has the rich seeded logs
+  const [selectedWeekIdx, setSelectedWeekIdx] = useState<number>(0); // Default to 0 (This Week)
+  const [selectedMonthOffset, setSelectedMonthOffset] = useState<number>(0); // 0 = current month, 1 = last month
   const [isEditingTarget, setIsEditingTarget] = useState<boolean>(false);
   const [tempTargetInput, setTempTargetInput] = useState<string>('');
 
-  const currentWeekDate = WEEKS[selectedWeekIdx].date;
-  const currentWeekLabel = WEEKS[selectedWeekIdx].label;
+  // Dynamically generate the 4 week ranges relative to current system date
+  const weeks = useMemo(() => {
+    const now = new Date();
+    const currentDay = now.getDay(); // 0 is Sunday
+    const currentSunday = new Date(now);
+    currentSunday.setDate(now.getDate() - currentDay);
+    currentSunday.setHours(0, 0, 0, 0);
 
-  // Compute stats for selected week dynamically
+    const list = [];
+    for (let i = 0; i < 4; i++) {
+      const weekStart = new Date(currentSunday);
+      weekStart.setDate(currentSunday.getDate() - i * 7);
+
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+
+      const startStr = weekStart.toISOString().split('T')[0];
+      const labelText =
+        i === 0
+          ? `This Week (${weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })})`
+          : i === 1
+          ? `Last Week (${weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })})`
+          : `${i} Weeks Ago (${weekStart.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })} - ${weekEnd.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })})`;
+
+      list.push({
+        date: startStr,
+        label: labelText,
+        startOfWeek: weekStart,
+        endOfWeek: weekEnd,
+      });
+    }
+    return list;
+  }, []);
+
+  const currentWeek = weeks[selectedWeekIdx] || weeks[0];
+
+  // Compute stats for selected week dynamically from actual opportunities
   const weeklyStats = useMemo(() => {
-    const startOfWeek = new Date(`${currentWeekDate}T00:00:00-07:00`);
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(endOfWeek.getDate() + 6);
-    endOfWeek.setHours(23, 59, 59, 999);
-
     const weekLogs = opportunities.filter((o) => {
       const d = new Date(o.timestamp);
-      return d >= startOfWeek && d <= endOfWeek;
+      return d >= currentWeek.startOfWeek && d <= currentWeek.endOfWeek;
     });
 
     const categoryCounts: { [cat: string]: number } = {};
@@ -55,16 +77,18 @@ export const WeeklyReview: React.FC<WeeklyReviewProps> = ({
       total: weekLogs.length,
       categories: categoryCounts,
     };
-  }, [opportunities, currentWeekDate]);
+  }, [opportunities, currentWeek]);
 
-  // Find the target from props, or default to 30
+  // Find target from props or default to 30
   const activeTarget = useMemo(() => {
-    return weeklyTargets.find((t) => t.weekStarting === currentWeekDate) || {
-      weekStarting: currentWeekDate,
-      targetCount: 30,
-      completedCount: weeklyStats.total,
-    };
-  }, [weeklyTargets, currentWeekDate, weeklyStats.total]);
+    return (
+      weeklyTargets.find((t) => t.weekStarting === currentWeek.date) || {
+        weekStarting: currentWeek.date,
+        targetCount: 30,
+        completedCount: weeklyStats.total,
+      }
+    );
+  }, [weeklyTargets, currentWeek.date, weeklyStats.total]);
 
   const progressPercent = useMemo(() => {
     if (activeTarget.targetCount <= 0) return 0;
@@ -79,40 +103,40 @@ export const WeeklyReview: React.FC<WeeklyReviewProps> = ({
   const handleSaveTarget = () => {
     const num = parseInt(tempTargetInput, 10);
     if (!isNaN(num) && num > 0) {
-      onUpdateWeeklyTarget(currentWeekDate, num);
+      onUpdateWeeklyTarget(currentWeek.date, num);
     }
     setIsEditingTarget(false);
   };
 
-  // Mock static values for prior months for high-fidelity reflection
-  const monthlyStats = {
-    June: {
-      total: 134,
-      details: [
-        '12 Job Applications',
-        '47 Sales Messages / Cold Emails',
-        '16 Pitch Meetings',
-        '9 Engineering Blog Posts',
-        '18 Gym Sessions',
-        'KSh 8,000 Saved & Deposited',
-        '42 Hours Dev Learning',
-      ],
-    },
-    May: {
-      total: 112,
-      details: [
-        '8 Job Applications',
-        '34 Cold Outreach Messages',
-        '9 Discovery Calls',
-        '6 Code Deployments',
-        '14 Workouts logged',
-        'KSh 5,000 Saved & Deposited',
-        '30 Hours Practice Coding',
-      ],
-    },
-  };
+  // Dynamically compute monthly stats from actual opportunities
+  const monthlyStats = useMemo(() => {
+    const targetMonthDate = new Date();
+    targetMonthDate.setMonth(targetMonthDate.getMonth() - selectedMonthOffset);
+    
+    const year = targetMonthDate.getFullYear();
+    const month = targetMonthDate.getMonth();
+    const monthName = targetMonthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 
-  const currentMonthStats = monthlyStats[selectedMonth];
+    const monthLogs = opportunities.filter((o) => {
+      const d = new Date(o.timestamp);
+      return d.getFullYear() === year && d.getMonth() === month;
+    });
+
+    const catSummary: { [cat: string]: number } = {};
+    monthLogs.forEach((o) => {
+      catSummary[o.category] = (catSummary[o.category] || 0) + 1;
+    });
+
+    const details = Object.entries(catSummary).map(
+      ([cat, count]) => `${count} ${cat} Opportunity ${count === 1 ? 'Log' : 'Logs'}`
+    );
+
+    return {
+      name: monthName,
+      total: monthLogs.length,
+      details: details.length > 0 ? details : ['No logged opportunities for this month.'],
+    };
+  }, [opportunities, selectedMonthOffset]);
 
   return (
     <div id="weekly-review-panel" className="bg-white dark:bg-sepia-900 rounded-2xl border border-cream-200 dark:border-sepia-800 p-6 shadow-sm flex flex-col h-full justify-between transition-all duration-300 font-sans">
@@ -151,15 +175,15 @@ export const WeeklyReview: React.FC<WeeklyReviewProps> = ({
             <div className="flex items-center justify-between border-b border-cream-100 dark:border-sepia-850 pb-2.5">
               <button
                 id="btn-prev-week"
-                disabled={selectedWeekIdx >= WEEKS.length - 1}
-                onClick={() => setSelectedWeekIdx((prev) => Math.min(WEEKS.length - 1, prev + 1))}
+                disabled={selectedWeekIdx >= weeks.length - 1}
+                onClick={() => setSelectedWeekIdx((prev) => Math.min(weeks.length - 1, prev + 1))}
                 className="p-1 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all text-sepia-400 hover:text-sepia-750 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
               <span className="text-[10px] font-bold text-sepia-805 dark:text-cream-200 flex items-center gap-1 font-mono uppercase tracking-wider">
                 <Calendar className="w-3.5 h-3.5 text-readflow-gold" />
-                {currentWeekLabel}
+                {currentWeek.label}
               </span>
               <button
                 id="btn-next-week"
@@ -282,19 +306,21 @@ export const WeeklyReview: React.FC<WeeklyReviewProps> = ({
             <div className="flex items-center justify-between">
               <button
                 id="btn-prev-month"
-                onClick={() => setSelectedMonth('May')}
-                className="p-1 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all text-sepia-400 hover:text-sepia-750 cursor-pointer"
+                disabled={selectedMonthOffset >= 5}
+                onClick={() => setSelectedMonthOffset((prev) => prev + 1)}
+                className="p-1 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all text-sepia-400 hover:text-sepia-750 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
               >
                 <ChevronLeft className="w-4 h-4" />
               </button>
-              <span className="text-xs font-bold text-sepia-850 dark:text-cream-100 flex items-center gap-1">
+              <span className="text-xs font-bold text-sepia-850 dark:text-cream-100 flex items-center gap-1 font-serif">
                 <Calendar className="w-3.5 h-3.5 text-readflow-gold" />
-                {selectedMonth} 2026 Statistics
+                {monthlyStats.name} Statistics
               </span>
               <button
                 id="btn-next-month"
-                onClick={() => setSelectedMonth('June')}
-                className="p-1 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all text-sepia-400 hover:text-sepia-750 cursor-pointer"
+                disabled={selectedMonthOffset <= 0}
+                onClick={() => setSelectedMonthOffset((prev) => Math.max(0, prev - 1))}
+                className="p-1 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all text-sepia-400 hover:text-sepia-750 disabled:opacity-30 disabled:pointer-events-none cursor-pointer"
               >
                 <ChevronRight className="w-4 h-4" />
               </button>
@@ -303,14 +329,14 @@ export const WeeklyReview: React.FC<WeeklyReviewProps> = ({
             {/* Total count */}
             <div className="text-center py-2 border-b border-cream-150 dark:border-sepia-850">
               <span className="text-2xl font-black font-mono text-readflow-green dark:text-readflow-lightgreen">
-                {currentMonthStats.total}
+                {monthlyStats.total}
               </span>
               <p className="text-[9px] font-bold uppercase text-sepia-400 tracking-wider">Total Opportunities Created</p>
             </div>
 
             {/* List details */}
             <div className="max-h-[140px] overflow-y-auto pr-1 space-y-1.5 scrollbar-thin">
-              {currentMonthStats.details.map((detail, idx) => (
+              {monthlyStats.details.map((detail, idx) => (
                 <div key={idx} className="flex items-center gap-2 p-1.5 rounded bg-cream-50/50 dark:bg-sepia-850/10 border border-cream-150 dark:border-sepia-850/40 text-[10px] text-sepia-750 dark:text-cream-200 font-semibold font-sans">
                   <div className="w-1.5 h-1.5 rounded-full bg-readflow-green shrink-0" />
                   <span className="truncate">{detail}</span>

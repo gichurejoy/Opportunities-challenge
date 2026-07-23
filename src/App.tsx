@@ -25,10 +25,22 @@ import { NudgeToast } from './components/NudgeToast';
 import { LandingPage } from './components/LandingPage';
 import { PrivacyPage } from './components/PrivacyPage';
 import { TermsPage } from './components/TermsPage';
-import { Sparkles, Trophy, Settings, Archive, Star, CheckCircle, Info, Sun, Moon, LayoutDashboard, ClipboardList, ListChecks, BellRing, Home } from 'lucide-react';
+import { AuthModal } from './components/AuthModal';
+import { OnboardingTour } from './components/OnboardingTour';
+import { BadgesModal } from './components/BadgesModal';
+import { WeeklyReportModal } from './components/WeeklyReportModal';
+import { QuickTemplates } from './components/QuickTemplates';
+import { User, api, authStorage } from './utils/api';
+import { Sparkles, Trophy, Settings, Archive, Star, CheckCircle, Info, Sun, Moon, LayoutDashboard, ClipboardList, ListChecks, BellRing, Home, LogIn, LogOut, User as UserIcon, Cloud, Database, Printer, Award, HelpCircle } from 'lucide-react';
+
 
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
+  const [isBadgesOpen, setIsBadgesOpen] = useState<boolean>(false);
+  const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
   const [showLanding, setShowLanding] = useState<boolean>(true);
   const [currentView, setCurrentView] = useState<'dashboard' | 'logbook' | 'checklist' | 'vision-details' | 'privacy' | 'terms'>('dashboard');
   const [selectedVisionId, setSelectedVisionId] = useState<string | null>(null);
@@ -54,20 +66,57 @@ export default function App() {
     }
   }, [darkMode]);
 
-  // Load state on mount
+  // Load state and authenticate user on mount
   useEffect(() => {
-    setState(localDb.loadState());
+    async function initAuthAndState() {
+      const user = await api.getCurrentUser();
+      setCurrentUser(user);
+      if (user) {
+        const dbState = await api.loadStateFromDb();
+        if (dbState) {
+          setState(dbState);
+          return;
+        }
+      }
+      setState(localDb.loadState());
+    }
+    initAuthAndState();
   }, []);
 
-  // Sync state to localDb on updates
+  // Sync state to localDb and DB (if authenticated) on updates
   const updateState = (updater: (prev: AppState) => AppState) => {
     setState((prev) => {
       if (!prev) return prev;
       const next = updater(prev);
       localDb.saveState(next);
+      if (authStorage.getToken()) {
+        api.saveStateToDb(next).catch(err => console.error('Cloud state sync error:', err));
+      }
       return next;
     });
   };
+
+  const handleAuthSuccess = async (user: User) => {
+    setCurrentUser(user);
+    const dbState = await api.loadStateFromDb();
+    if (dbState) {
+      setState(dbState);
+      if ((dbState.opportunities || []).length === 0) {
+        setIsOnboardingOpen(true);
+      }
+    } else if (state) {
+      await api.saveStateToDb(state);
+      if ((state.opportunities || []).length === 0) {
+        setIsOnboardingOpen(true);
+      }
+    }
+  };
+
+  const handleSignOut = () => {
+    authStorage.removeToken();
+    setCurrentUser(null);
+  };
+
 
   // 1. Log a new opportunity
   const handleLogOpportunity = (newOpp: Omit<Opportunity, 'id' | 'timestamp'> & { timestamp?: string }) => {
@@ -530,16 +579,24 @@ export default function App() {
   const totalOppsCount = state.opportunities.length;
   const challengeProgressPercent = Math.min(100, Math.round((totalOppsCount / 1000) * 100));
 
-  if (showLanding) {
+  // Authentication Guard: Require sign in / creation to access dashboard
+  if (!currentUser) {
     return (
-      <LandingPage
-        onEnterApp={() => setShowLanding(false)}
-        darkMode={darkMode}
-        setDarkMode={setDarkMode}
-        totalOppsCount={totalOppsCount}
-        scoreConfig={state.scoreConfig}
-        onLogOpportunity={handleLogOpportunity}
-      />
+      <>
+        <LandingPage
+          onEnterApp={() => setIsAuthModalOpen(true)}
+          darkMode={darkMode}
+          setDarkMode={setDarkMode}
+          totalOppsCount={totalOppsCount}
+          scoreConfig={state.scoreConfig}
+          onLogOpportunity={handleLogOpportunity}
+        />
+        <AuthModal
+          isOpen={isAuthModalOpen}
+          onClose={() => setIsAuthModalOpen(false)}
+          onSuccess={handleAuthSuccess}
+        />
+      </>
     );
   }
 
@@ -563,15 +620,8 @@ export default function App() {
               </div>
             </div>
             
-            {/* Mobile Nav Toggle */}
+            {/* Mobile Nav Actions */}
             <div className="flex items-center gap-2 md:hidden">
-              <button
-                onClick={() => setShowLanding(true)}
-                className="p-2 rounded-lg bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 text-sepia-700 dark:text-cream-200 hover:bg-cream-150 dark:hover:bg-sepia-750 transition-all cursor-pointer text-xs font-bold flex items-center gap-1"
-                title="Return to Landing Page"
-              >
-                <Home className="w-3.5 h-3.5" /> Landing
-              </button>
               <button
                 onClick={() => setDarkMode(!darkMode)}
                 className="p-2 rounded-lg bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 text-sepia-700 dark:text-cream-200 hover:bg-cream-150 dark:hover:bg-sepia-750 transition-all cursor-pointer"
@@ -602,15 +652,59 @@ export default function App() {
               </div>
             </div>
 
-            {/* Desktop Landing Toggle & Theme Switcher */}
-            <div className="hidden md:flex items-center gap-3">
+            {/* Desktop Theme Switcher & User Account */}
+            <div className="hidden md:flex items-center gap-2.5">
               <button
-                onClick={() => setShowLanding(true)}
-                className="p-2.5 rounded-lg bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 text-sepia-700 dark:text-cream-200 hover:bg-cream-150 dark:hover:bg-sepia-750 transition-all cursor-pointer text-xs font-bold flex items-center gap-1.5 animate-pulse"
-                title="Return to Landing Page"
+                onClick={() => setIsBadgesOpen(true)}
+                className="px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/60"
+                title="View Milestone Badges"
               >
-                <Home className="w-3.5 h-3.5" /> View Landing
+                <Award className="w-3.5 h-3.5 text-amber-500" />
+                <span>Badges</span>
               </button>
+
+              <button
+                onClick={() => setIsReportOpen(true)}
+                className="px-3 py-2 rounded-xl bg-readflow-green/10 dark:bg-readflow-green/20 border border-readflow-green/20 text-readflow-green dark:text-readflow-lightgreen text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer hover:bg-readflow-green/20"
+                title="Generate Weekly Catalyst Report"
+              >
+                <Printer className="w-3.5 h-3.5 text-readflow-gold" />
+                <span>Report</span>
+              </button>
+
+              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 shadow-sm">
+                {currentUser.avatarUrl ? (
+                  <img src={currentUser.avatarUrl} alt={currentUser.name || 'User'} className="w-6 h-6 rounded-full object-cover" />
+                ) : (
+                  <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold uppercase">
+                    {(currentUser.name || currentUser.email)[0]}
+                  </div>
+                )}
+                <div className="flex flex-col text-left">
+                  <span className="text-xs font-bold truncate max-w-[100px] text-sepia-900 dark:text-cream-100 leading-tight">
+                    {currentUser.name || currentUser.email.split('@')[0]}
+                  </span>
+                  <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono font-semibold flex items-center gap-0.5">
+                    <Cloud className="w-2.5 h-2.5" /> Cloud DB
+                  </span>
+                </div>
+                <button
+                  onClick={handleSignOut}
+                  className="ml-1 p-1 rounded-full text-sepia-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                  title="Sign Out"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <button
+                onClick={() => setIsOnboardingOpen(true)}
+                className="p-2.5 rounded-lg bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 text-sepia-700 dark:text-cream-200 hover:bg-cream-150 dark:hover:bg-sepia-750 transition-all cursor-pointer"
+                title="Re-open Onboarding Tour"
+              >
+                <HelpCircle className="w-4 h-4 text-readflow-gold" />
+              </button>
+
               <button
                 onClick={() => setDarkMode(!darkMode)}
                 className="p-2.5 rounded-lg bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 text-sepia-700 dark:text-cream-200 hover:bg-cream-150 dark:hover:bg-sepia-750 transition-all cursor-pointer"
@@ -636,7 +730,7 @@ export default function App() {
             }`}
           >
             <LayoutDashboard className="w-4 h-4" />
-            Bento Dashboard
+            Dashboard
           </button>
           <button
             id="nav-tab-logbook"
@@ -688,10 +782,15 @@ export default function App() {
               />
             </section>
 
-            {/* Dashboard Bento Grid */}
-            <section id="bento-grid" className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-              {/* Block 1 (Quick Logger + Inspiration Widget) */}
+            {/* Dashboard Layout Grid */}
+            <section id="dashboard-grid" className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+              {/* Block 1 (Quick Templates + Quick Logger + Inspiration Widget) */}
               <div className="lg:col-span-1 flex flex-col gap-6">
+                <QuickTemplates
+                  onLogOpportunity={(title, category, type, points) =>
+                    handleLogOpportunity({ title, category, type, points })
+                  }
+                />
                 <QuickLogger
                   scoreConfig={state.scoreConfig}
                   onLogOpportunity={handleLogOpportunity}
@@ -724,10 +823,10 @@ export default function App() {
             </section>
 
             {/* Dashboard Row 2: Analytics, Review, & Pipelines */}
-            <section id="secondary-bento" className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <section id="secondary-dashboard-grid" className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
               {/* Analytics & Weekly Review block */}
               <div className="lg:col-span-1 flex flex-col gap-6">
-                <Analytics />
+                <Analytics opportunities={state.opportunities} pipelines={state.pipelines} />
                 <WeeklyReview 
                   opportunities={state.opportunities} 
                   weeklyTargets={state.weeklyTargets || []}
@@ -914,6 +1013,41 @@ export default function App() {
           onClose={handleCloseNudge}
         />
       )}
+
+      {/* Authentication & User Account Modal */}
+      <AuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={handleAuthSuccess}
+      />
+
+      {/* Onboarding Welcome Tour Modal */}
+      <OnboardingTour
+        isOpen={isOnboardingOpen}
+        onClose={() => setIsOnboardingOpen(false)}
+        onLogFirstOpportunity={(title, category, type, points) => {
+          handleLogOpportunity({ title, category, type, points });
+        }}
+      />
+
+      {/* Badges & Achievements Modal */}
+      <BadgesModal
+        isOpen={isBadgesOpen}
+        onClose={() => setIsBadgesOpen(false)}
+        opportunities={state.opportunities}
+        pipelines={state.pipelines}
+        currentStreak={state.streakStates?.opportunity?.currentStreak || 0}
+      />
+
+      {/* Weekly Catalyst Report Modal */}
+      <WeeklyReportModal
+        isOpen={isReportOpen}
+        onClose={() => setIsReportOpen(false)}
+        opportunities={state.opportunities}
+        pipelines={state.pipelines}
+        visions={state.visions}
+        userName={currentUser?.name || currentUser?.email}
+      />
     </div>
   );
 }
