@@ -17,7 +17,9 @@ import {
   AlertCircle,
   X,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Building,
+  Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -73,6 +75,8 @@ export const Pipeline: React.FC<PipelineProps> = ({
 
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [newTitle, setNewTitle] = useState<string>('');
+  const [newCompanyOrClient, setNewCompanyOrClient] = useState<string>('');
+  const [newExpectedValue, setNewExpectedValue] = useState<string>('');
   const [newTemplateIdx, setNewTemplateIdx] = useState<number>(0);
   const [newCustomStages, setNewCustomStages] = useState<string>('');
   const [newNotes, setNewNotes] = useState<string>('');
@@ -167,6 +171,8 @@ export const Pipeline: React.FC<PipelineProps> = ({
       title: newTitle.trim(),
       type: newTemplateIdx === -1 ? 'Custom' : template.type,
       category: newTemplateIdx === -1 ? 'Career' : template.category,
+      companyOrClient: newCompanyOrClient.trim() || undefined,
+      expectedValue: newExpectedValue.trim() || undefined,
       stages,
       currentStageIndex: 0,
       status: 'active',
@@ -174,6 +180,8 @@ export const Pipeline: React.FC<PipelineProps> = ({
     });
 
     setNewTitle('');
+    setNewCompanyOrClient('');
+    setNewExpectedValue('');
     setNewNotes('');
     setNewCustomStages('');
     setIsCreating(false);
@@ -247,8 +255,37 @@ export const Pipeline: React.FC<PipelineProps> = ({
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
                 placeholder="e.g. Senior Backend Role - Microsoft"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans"
               />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-sepia-450 dark:text-sepia-500 mb-1">
+                  Target Company / Client / Institution (Optional)
+                </label>
+                <input
+                  id="new-pipe-company"
+                  type="text"
+                  value={newCompanyOrClient}
+                  onChange={(e) => setNewCompanyOrClient(e.target.value)}
+                  placeholder="e.g. Acme Corp, Microsoft, Stanford"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-sepia-450 dark:text-sepia-500 mb-1">
+                  Expected Salary / Grant / Value (Optional)
+                </label>
+                <input
+                  id="new-pipe-expected-value"
+                  type="text"
+                  value={newExpectedValue}
+                  onChange={(e) => setNewExpectedValue(e.target.value)}
+                  placeholder="e.g. $120k / yr, $25,000 grant"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans"
+                />
+              </div>
             </div>
 
             <div>
@@ -286,7 +323,7 @@ export const Pipeline: React.FC<PipelineProps> = ({
                   value={newCustomStages}
                   onChange={(e) => setNewCustomStages(e.target.value)}
                   placeholder="e.g. Lead Sourced, Contacted, Meeting, Won"
-                  className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans"
                 />
               </div>
             )}
@@ -301,7 +338,7 @@ export const Pipeline: React.FC<PipelineProps> = ({
                 onChange={(e) => setNewNotes(e.target.value)}
                 placeholder="Initial background details or next actions required."
                 rows={2}
-                className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-none"
+                className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-none font-sans"
               />
             </div>
           </div>
@@ -317,7 +354,7 @@ export const Pipeline: React.FC<PipelineProps> = ({
       ) : (
         <div className="flex-1 flex flex-col sm:flex-row gap-4 min-h-[300px]">
           {/* Pipelines select list */}
-          <div className="w-full sm:w-1/3 border-b sm:border-b-0 sm:border-r border-cream-150 dark:border-sepia-850 pb-3 sm:pb-0 sm:pr-3 flex flex-row sm:flex-col gap-1.5 sm:space-y-1.5 overflow-x-auto sm:overflow-y-auto max-h-[110px] sm:max-h-[340px] shrink-0">
+          <div className="w-full sm:w-1/3 border-b sm:border-b-0 sm:border-r border-cream-150 dark:border-sepia-850 pb-3 sm:pb-0 sm:pr-3 flex flex-row sm:flex-col gap-1.5 sm:space-y-1.5 overflow-x-auto sm:overflow-y-auto max-h-[140px] sm:max-h-[380px] shrink-0">
             {pipelines.length === 0 ? (
               <p className="text-xs text-sepia-400 italic text-center py-6 w-full">No active pipelines.</p>
             ) : (
@@ -328,16 +365,30 @@ export const Pipeline: React.FC<PipelineProps> = ({
                     key={pipe.id}
                     id={`pipe-select-${pipe.id}`}
                     onClick={() => updateSelectedId(pipe.id)}
-                    className={`shrink-0 w-[150px] sm:w-full p-2.5 rounded-xl text-left border transition-all flex flex-col justify-between cursor-pointer ${
+                    className={`shrink-0 w-[160px] sm:w-full p-2.5 rounded-xl text-left border transition-all flex flex-col justify-between cursor-pointer ${
                       isSelected
                         ? 'bg-cream-50 dark:bg-sepia-800/30 border-cream-200 dark:border-sepia-800 shadow-sm font-semibold scale-[1.01]'
                         : 'border-transparent hover:bg-cream-50/50 dark:hover:bg-sepia-800/10'
                     }`}
                   >
-                    <span className="text-xs text-sepia-800 dark:text-cream-100 truncate font-bold block w-full">
-                      {pipe.title}
-                    </span>
-                    <div className="flex items-center justify-between mt-1 text-[9px] text-sepia-450 w-full">
+                    <div>
+                      <span className="text-xs text-sepia-800 dark:text-cream-100 truncate font-bold block w-full">
+                        {pipe.title}
+                      </span>
+                      {pipe.companyOrClient && (
+                        <div className="flex items-center gap-1 text-[10px] text-amber-800 dark:text-amber-300 font-medium truncate mt-0.5">
+                          <Building className="w-2.5 h-2.5 shrink-0" />
+                          <span className="truncate">{pipe.companyOrClient}</span>
+                        </div>
+                      )}
+                      {pipe.expectedValue && (
+                        <div className="flex items-center gap-1 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold font-mono truncate mt-0.5">
+                          <Coins className="w-2.5 h-2.5 shrink-0" />
+                          <span className="truncate">{pipe.expectedValue}</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between mt-2 text-[9px] text-sepia-450 w-full">
                       <span className="bg-cream-100 dark:bg-sepia-850 px-1.5 py-0.2 rounded font-semibold text-sepia-700 dark:text-cream-200">
                         {pipe.type}
                       </span>
@@ -361,10 +412,27 @@ export const Pipeline: React.FC<PipelineProps> = ({
                   {/* Pipeline Header */}
                   <div className="flex items-start justify-between border-b border-cream-150 dark:border-sepia-850 pb-3">
                     <div>
-                      <h3 className="text-sm font-bold text-sepia-850 dark:text-cream-100">
-                        {selectedPipeline.title}
-                      </h3>
-                      <p className="text-[10px] text-sepia-400 dark:text-sepia-550 mt-0.5 font-medium">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-sm font-bold text-sepia-850 dark:text-cream-100">
+                          {selectedPipeline.title}
+                        </h3>
+                        <span className="bg-cream-100 dark:bg-sepia-850 px-2 py-0.5 rounded text-[10px] font-bold text-sepia-700 dark:text-cream-200">
+                          {selectedPipeline.type}
+                        </span>
+                        {selectedPipeline.companyOrClient && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-800 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/40 px-2 py-0.5 rounded border border-amber-200 dark:border-amber-800/60 font-sans">
+                            <Building className="w-3 h-3 text-amber-600" />
+                            {selectedPipeline.companyOrClient}
+                          </span>
+                        )}
+                        {selectedPipeline.expectedValue && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/60 font-mono">
+                            <Coins className="w-3 h-3 text-emerald-600" />
+                            {selectedPipeline.expectedValue}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[10px] text-sepia-400 dark:text-sepia-550 mt-1 font-medium font-sans">
                         Created {new Date(selectedPipeline.createdAt).toLocaleDateString()} • Updated {new Date(selectedPipeline.updatedAt).toLocaleDateString()}
                       </p>
                     </div>

@@ -65,6 +65,8 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('Career');
   const [simpleTitle, setSimpleTitle] = useState<string>('');
   const [companyOrClient, setCompanyOrClient] = useState<string>('');
+  const [expectedValue, setExpectedValue] = useState<string>('');
+  const [description, setDescription] = useState<string>('');
   const [customTitle, setCustomTitle] = useState<string>('');
   const [customPoints, setCustomPoints] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<'simple' | 'preset' | 'custom' | 'checklist'>('simple');
@@ -89,12 +91,16 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
       type: 'Direct Input',
       points: firstPresetPoints,
       companyOrClient: companyOrClient.trim() || undefined,
+      expectedValue: expectedValue.trim() || undefined,
       linkedVisionId: selectedVisionId || undefined,
+      description: description.trim() || undefined,
     });
 
     setSimpleTitle('');
     setCompanyOrClient('');
+    setExpectedValue('');
     setSelectedVisionId('');
+    setDescription('');
   };
 
   const handleLogPreset = (type: string, points: number) => {
@@ -104,10 +110,14 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
       type,
       points,
       companyOrClient: companyOrClient.trim() || undefined,
+      expectedValue: expectedValue.trim() || undefined,
       linkedVisionId: selectedVisionId || undefined,
+      description: description.trim() || undefined,
     });
     setCompanyOrClient('');
+    setExpectedValue('');
     setSelectedVisionId('');
+    setDescription('');
   };
 
   const handleLogCustom = (e: React.FormEvent) => {
@@ -120,13 +130,17 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
       type: 'Custom Initiative',
       points: customPoints || 1,
       companyOrClient: companyOrClient.trim() || undefined,
+      expectedValue: expectedValue.trim() || undefined,
       linkedVisionId: selectedVisionId || undefined,
+      description: description.trim() || undefined,
     });
 
     setCustomTitle('');
     setCustomPoints(0);
     setCompanyOrClient('');
+    setExpectedValue('');
     setSelectedVisionId('');
+    setDescription('');
   };
 
   const handleToggleChecklistHabit = (habit: ChecklistHabit) => {
@@ -276,17 +290,46 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
               />
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
+                  Target Company / Client (Optional)
+                </label>
+                <input
+                  id="simple-company-input"
+                  type="text"
+                  value={companyOrClient}
+                  onChange={(e) => setCompanyOrClient(e.target.value)}
+                  placeholder="e.g. Acme Corp, Microsoft, Stanford"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
+                  Expected Salary / Grant / Amount (Optional)
+                </label>
+                <input
+                  id="simple-expected-value-input"
+                  type="text"
+                  value={expectedValue}
+                  onChange={(e) => setExpectedValue(e.target.value)}
+                  placeholder="e.g. $120k / yr, $15,000 grant, KSh 50k"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+                />
+              </div>
+            </div>
+
             <div>
               <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
-                Target Company / Client / Institution (Optional)
+                Job Description / Enquiry Details (Optional)
               </label>
-              <input
-                id="simple-company-input"
-                type="text"
-                value={companyOrClient}
-                onChange={(e) => setCompanyOrClient(e.target.value)}
-                placeholder="e.g. Acme Corp, Microsoft, Client John, Stanford"
-                className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+              <textarea
+                id="simple-desc-input"
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. paste job description, requirements, or enquiry copy..."
+                className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen resize-y font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
               />
             </div>
 
@@ -335,6 +378,49 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
               </select>
             </div>
 
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
+                  Target Company / Client (Optional)
+                </label>
+                <input
+                  id="preset-company-input"
+                  type="text"
+                  value={companyOrClient}
+                  onChange={(e) => setCompanyOrClient(e.target.value)}
+                  placeholder="e.g. Acme Corp, Microsoft, Stanford"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
+                  Expected Salary / Grant / Amount (Optional)
+                </label>
+                <input
+                  id="preset-expected-value-input"
+                  type="text"
+                  value={expectedValue}
+                  onChange={(e) => setExpectedValue(e.target.value)}
+                  placeholder="e.g. $120k / yr, $15k grant"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+                />
+              </div>
+            </div>
+
+            <div className="mb-3">
+              <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
+                Job Description / Enquiry Details (Optional)
+              </label>
+              <textarea
+                id="preset-desc-input"
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. paste job description, requirements, or enquiry copy..."
+                className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen resize-y font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+              />
+            </div>
+
             <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
               {Object.keys(currentCategoryPresets).length === 0 ? (
                 <p className="text-xs text-sepia-400 text-center py-4">No presets defined. Use simple mode!</p>
@@ -377,6 +463,49 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
                 onChange={(e) => setCustomTitle(e.target.value)}
                 placeholder="e.g. Completed specialized business proposal deck"
                 className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-900 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen font-sans"
+              />
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
+                  Target Company / Client (Optional)
+                </label>
+                <input
+                  id="custom-company-input"
+                  type="text"
+                  value={companyOrClient}
+                  onChange={(e) => setCompanyOrClient(e.target.value)}
+                  placeholder="e.g. Acme Corp, Microsoft, Stanford"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
+                  Expected Salary / Grant / Amount (Optional)
+                </label>
+                <input
+                  id="custom-expected-value-input"
+                  type="text"
+                  value={expectedValue}
+                  onChange={(e) => setExpectedValue(e.target.value)}
+                  placeholder="e.g. $120k / yr, $15k grant"
+                  className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
+                Job Description / Enquiry Details (Optional)
+              </label>
+              <textarea
+                id="custom-desc-input"
+                rows={2}
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="e.g. paste job description, requirements, or enquiry copy..."
+                className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen resize-y font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
               />
             </div>
 

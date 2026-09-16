@@ -12,6 +12,7 @@ export interface Opportunity {
   points: number;
   timestamp: string; // ISO string
   companyOrClient?: string;
+  expectedValue?: string; // Expected salary, grant amount, or contract value (e.g. "$120k/yr", "KSh 500k")
   isSystemSuggestion?: boolean;
   feedback?: string;
   stage?: string;
@@ -45,6 +46,8 @@ export interface OpportunityPipeline {
   id: string;
   title: string;
   type: 'Job' | 'Business' | 'Scholarship' | 'Custom';
+  companyOrClient?: string;
+  expectedValue?: string; // Expected salary, grant amount, or deal value
   stages: PipelineStage[];
   currentStageIndex: number;
   status: 'active' | 'won' | 'lost';

@@ -5,15 +5,16 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Opportunity } from '../types';
-import { Search, Download, Upload, Trash2, SlidersHorizontal, Archive, RefreshCw, Edit2, Check, X } from 'lucide-react';
+import { Search, Download, Upload, Trash2, SlidersHorizontal, Archive, RefreshCw, Edit2, Check, X, Building, FileSpreadsheet, Coins } from 'lucide-react';
 import { CATEGORY_METADATA } from './QuickLogger';
+import { FormattedText } from './FormattedText';
 
 interface VaultProps {
   opportunities: Opportunity[];
-  onImportVault: (importedState: any) => void;
+  onImportVault: (data: any) => void;
   onClearVault: () => void;
   onDeleteOpportunity: (id: string) => void;
-  onUpdateOpportunity: (updatedOpp: Opportunity) => void;
+  onUpdateOpportunity: (opp: Opportunity) => void;
 }
 
 export const Vault: React.FC<VaultProps> = ({
@@ -24,7 +25,7 @@ export const Vault: React.FC<VaultProps> = ({
   onUpdateOpportunity,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -35,6 +36,9 @@ export const Vault: React.FC<VaultProps> = ({
   const [editType, setEditType] = useState('');
   const [editPoints, setEditPoints] = useState<number>(0);
   const [editTimestamp, setEditTimestamp] = useState('');
+  const [editCompanyOrClient, setEditCompanyOrClient] = useState('');
+  const [editExpectedValue, setEditExpectedValue] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
   const ITEMS_PER_PAGE = 8;
 
@@ -42,6 +46,8 @@ export const Vault: React.FC<VaultProps> = ({
   const filteredOpps = useMemo(() => {
     return opportunities.filter((opp) => {
       const matchesSearch = opp.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+        (opp.companyOrClient && opp.companyOrClient.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (opp.expectedValue && opp.expectedValue.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (opp.type && opp.type.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (opp.description && opp.description.toLowerCase().includes(searchQuery.toLowerCase()));
       const matchesCategory = selectedCategory === 'All' || opp.category === selectedCategory;
@@ -69,6 +75,49 @@ export const Vault: React.FC<VaultProps> = ({
     document.body.appendChild(downloadAnchor);
     downloadAnchor.click();
     downloadAnchor.remove();
+  };
+
+  // Export database as clean CSV spreadsheet
+  const handleExportCSV = () => {
+    if (opportunities.length === 0) {
+      alert('No opportunities to export.');
+      return;
+    }
+
+    const headers = [
+      'Title',
+      'Company / Client / Institution',
+      'Expected Salary / Grant / Value',
+      'Category',
+      'Type',
+      'Points',
+      'Stage',
+      'Date Logged',
+      'Notes / Description'
+    ];
+
+    const rows = opportunities.map((opp) => [
+      `"${(opp.title || '').replace(/"/g, '""')}"`,
+      `"${(opp.companyOrClient || '').replace(/"/g, '""')}"`,
+      `"${(opp.expectedValue || '').replace(/"/g, '""')}"`,
+      `"${(opp.category || '').replace(/"/g, '""')}"`,
+      `"${(opp.type || '').replace(/"/g, '""')}"`,
+      opp.points || 0,
+      `"${(opp.stage || 'Sourced').replace(/"/g, '""')}"`,
+      `"${new Date(opp.timestamp).toLocaleDateString()}"`,
+      `"${(opp.description || opp.feedback || '').replace(/"/g, '""')}"`
+    ]);
+
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\r\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.href = url;
+    downloadAnchor.download = `1000_opportunities_export_${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
+    URL.revokeObjectURL(url);
   };
 
   // Import database from JSON file
@@ -119,7 +168,7 @@ export const Vault: React.FC<VaultProps> = ({
           </div>
 
           {/* Export/Import/Clear controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <input
               type="file"
               ref={fileInputRef}
@@ -137,13 +186,22 @@ export const Vault: React.FC<VaultProps> = ({
               Import
             </button>
             <button
+              id="btn-export-csv"
+              onClick={handleExportCSV}
+              className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all cursor-pointer shadow-sm"
+              title="Export as CSV spreadsheet for Excel / Google Sheets"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5 text-white" />
+              Export CSV
+            </button>
+            <button
               id="btn-export-vault"
               onClick={handleExport}
               className="flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg bg-readflow-green hover:bg-readflow-green/90 dark:bg-readflow-olive dark:hover:bg-readflow-olive/90 text-cream-100 transition-all cursor-pointer shadow-sm"
-              title="Export complete backup"
+              title="Export complete JSON backup"
             >
               <Download className="w-3.5 h-3.5 text-cream-100" />
-              Export Backup
+              Export JSON
             </button>
             <button
               id="btn-clear-vault"
@@ -236,6 +294,30 @@ export const Vault: React.FC<VaultProps> = ({
                               className="w-full px-2 py-1 text-xs rounded border border-cream-300 dark:border-sepia-700 bg-white dark:bg-sepia-900 text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
                               placeholder="Action title"
                             />
+                            <input
+                              id={`vault-edit-company-${opp.id}`}
+                              type="text"
+                              value={editCompanyOrClient}
+                              onChange={(e) => setEditCompanyOrClient(e.target.value)}
+                              className="w-full mt-1 px-2 py-0.5 text-[10px] rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
+                              placeholder="Company/Client (optional)"
+                            />
+                            <input
+                              id={`vault-edit-expected-value-${opp.id}`}
+                              type="text"
+                              value={editExpectedValue}
+                              onChange={(e) => setEditExpectedValue(e.target.value)}
+                              className="w-full mt-1 px-2 py-0.5 text-[10px] rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
+                              placeholder="Expected salary/grant/value (optional)"
+                            />
+                            <textarea
+                              id={`vault-edit-description-${opp.id}`}
+                              value={editDescription}
+                              onChange={(e) => setEditDescription(e.target.value)}
+                              className="w-full mt-1 px-2 py-0.5 text-[10px] rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
+                              placeholder="Job Description/Enquiry (optional)"
+                              rows={1}
+                            />
                           </td>
                           <td className="p-2">
                             <select
@@ -296,6 +378,9 @@ export const Vault: React.FC<VaultProps> = ({
                                     type: editType.trim(),
                                     points: editPoints,
                                     timestamp: newTimestamp,
+                                    companyOrClient: editCompanyOrClient.trim() || undefined,
+                                    expectedValue: editExpectedValue.trim() || undefined,
+                                    description: editDescription.trim() || undefined,
                                   });
                                   setEditingOppId(null);
                                 }}
@@ -321,7 +406,28 @@ export const Vault: React.FC<VaultProps> = ({
                     return (
                       <tr key={opp.id} className="hover:bg-cream-50/50 dark:hover:bg-sepia-800/10 transition-colors">
                         <td className="p-3 font-semibold text-sepia-800 dark:text-cream-100 max-w-[200px] truncate">
-                          {opp.title}
+                          <div className="truncate" title={opp.title}>{opp.title}</div>
+                          {opp.companyOrClient && (
+                            <div className="mt-1 text-[10px] text-amber-800 dark:text-amber-300 font-semibold flex items-center gap-1 font-sans">
+                              <Building className="w-3 h-3 text-amber-600 dark:text-amber-450 shrink-0" />
+                              <span className="truncate max-w-[170px]" title={opp.companyOrClient}>
+                                {opp.companyOrClient}
+                              </span>
+                            </div>
+                          )}
+                          {opp.expectedValue && (
+                            <div className="mt-0.5 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1 font-sans">
+                              <Coins className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              <span className="truncate max-w-[170px]" title={opp.expectedValue}>
+                                {opp.expectedValue}
+                              </span>
+                            </div>
+                          )}
+                          {opp.description && (
+                            <div className="mt-1 text-[10px] text-sepia-650 dark:text-sepia-400 bg-cream-50/50 dark:bg-sepia-850/40 px-1.5 py-1 rounded border border-cream-100 dark:border-sepia-800/80 font-sans max-w-[180px] max-h-[60px] overflow-y-auto">
+                              <FormattedText text={opp.description} />
+                            </div>
+                          )}
                         </td>
                         <td className="p-3">
                           <span className={`inline-flex items-center gap-1 font-bold ${meta.text}`}>
@@ -349,6 +455,9 @@ export const Vault: React.FC<VaultProps> = ({
                                 setEditType(opp.type);
                                 setEditPoints(opp.points);
                                 setEditTimestamp(opp.timestamp.substring(0, 10));
+                                setEditCompanyOrClient(opp.companyOrClient || '');
+                                setEditExpectedValue(opp.expectedValue || '');
+                                setEditDescription(opp.description || '');
                               }}
                               className="text-sepia-400 hover:text-readflow-green p-1 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all cursor-pointer"
                               title="Edit record"

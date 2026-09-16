@@ -621,7 +621,40 @@ export default function App() {
             </div>
             
             {/* Mobile Nav Actions */}
-            <div className="flex items-center gap-2 md:hidden">
+            <div className="flex items-center gap-1.5 md:hidden">
+              <button
+                onClick={() => setIsBadgesOpen(true)}
+                className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 transition-all cursor-pointer"
+                title="View Milestone Badges"
+              >
+                <Award className="w-4 h-4 text-amber-500" />
+              </button>
+
+              <button
+                onClick={() => setIsReportOpen(true)}
+                className="p-2 rounded-lg bg-readflow-green/10 dark:bg-readflow-green/20 border border-readflow-green/20 text-readflow-green dark:text-readflow-lightgreen transition-all cursor-pointer"
+                title="Generate Weekly Catalyst Report"
+              >
+                <Printer className="w-4 h-4 text-readflow-gold" />
+              </button>
+
+              <div className="flex items-center gap-1 px-1.5 py-1 rounded-full bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 shadow-sm">
+                {currentUser.avatarUrl ? (
+                  <img src={currentUser.avatarUrl} alt={currentUser.name || 'User'} className="w-5 h-5 rounded-full object-cover" />
+                ) : (
+                  <div className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold uppercase">
+                    {(currentUser.name || currentUser.email)[0]}
+                  </div>
+                )}
+                <button
+                  onClick={handleSignOut}
+                  className="p-1 text-sepia-400 hover:text-rose-500 transition-colors cursor-pointer"
+                  title="Sign Out"
+                >
+                  <LogOut className="w-3 h-3" />
+                </button>
+              </div>
+
               <button
                 onClick={() => setDarkMode(!darkMode)}
                 className="p-2 rounded-lg bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 text-sepia-700 dark:text-cream-200 hover:bg-cream-150 dark:hover:bg-sepia-750 transition-all cursor-pointer"

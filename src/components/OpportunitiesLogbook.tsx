@@ -20,9 +20,11 @@ import {
   ChevronLeft,
   ChevronRight,
   MessageSquare,
-  Building
+  Building,
+  Coins
 } from 'lucide-react';
 import { CATEGORY_METADATA } from './QuickLogger';
+import { FormattedText } from './FormattedText';
 
 interface OpportunitiesLogbookProps {
   opportunities: Opportunity[];
@@ -71,11 +73,13 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   const [editCategory, setEditCategory] = useState('');
   const [editType, setEditType] = useState('');
   const [editCompanyOrClient, setEditCompanyOrClient] = useState('');
+  const [editExpectedValue, setEditExpectedValue] = useState('');
   const [editPoints, setEditPoints] = useState<number>(0);
   const [editFeedback, setEditFeedback] = useState('');
   const [editStage, setEditStage] = useState('');
   const [editDate, setEditDate] = useState('');
   const [editLinkedVisionId, setEditLinkedVisionId] = useState('');
+  const [editDescription, setEditDescription] = useState('');
 
   // Drag and drop / upload refs
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
@@ -90,6 +94,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   const filteredOpps = opportunities.filter((opp) => {
     const matchesSearch = opp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           (opp.companyOrClient && opp.companyOrClient.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                          (opp.expectedValue && opp.expectedValue.toLowerCase().includes(searchQuery.toLowerCase())) ||
                           (opp.type && opp.type.toLowerCase().includes(searchQuery.toLowerCase())) ||
                           (opp.description && opp.description.toLowerCase().includes(searchQuery.toLowerCase()));
     
@@ -131,25 +136,37 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
 
   // Export Opportunities progress to a local CSV backup file
   const exportToCSV = () => {
-    const headers = ['Title', 'Target Company/Client', 'Category', 'Subtype/Tag', 'Score Points', 'Stage Status', 'Qualitative Notes/Feedback', 'Logged Date', 'Linked Vision/Goal ID'];
-    const rows = opportunities.map(opp => [
+    const headers = [
+      'Title',
+      'Target Company/Client',
+      'Expected Salary/Grant/Value',
+      'Category',
+      'Subtype/Tag',
+      'Score Points',
+      'Stage Status',
+      'Qualitative Notes/Feedback',
+      'Logged Date',
+      'Linked Vision/Goal ID'
+    ];
+    const rows = opportunities.map((opp) => [
       `"${opp.title.replace(/"/g, '""')}"`,
       `"${(opp.companyOrClient || '').replace(/"/g, '""')}"`,
+      `"${(opp.expectedValue || '').replace(/"/g, '""')}"`,
       `"${opp.category}"`,
       `"${(opp.type || '').replace(/"/g, '""')}"`,
       opp.points,
       `"${(opp.stage || 'Sourced').replace(/"/g, '""')}"`,
-      `"${(opp.feedback || '').replace(/"/g, '""')}"`,
+      `"${(opp.feedback || opp.description || '').replace(/"/g, '""')}"`,
       `"${new Date(opp.timestamp).toLocaleDateString()}"`,
       `"${opp.linkedVisionId || ''}"`
     ]);
     
-    const csvContent = [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.setAttribute('href', url);
-    link.setAttribute('download', `opportunities_backup_${new Date().toISOString().slice(0,10)}.csv`);
+    link.setAttribute('download', `opportunities_backup_${new Date().toISOString().slice(0, 10)}.csv`);
     link.style.visibility = 'hidden';
     document.body.appendChild(link);
     link.click();
@@ -163,11 +180,13 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
     setEditCategory(opp.category);
     setEditType(opp.type);
     setEditCompanyOrClient(opp.companyOrClient || '');
+    setEditExpectedValue(opp.expectedValue || '');
     setEditPoints(opp.points);
     setEditFeedback(opp.feedback || '');
     setEditStage(opp.stage || 'Sourced');
     setEditDate(opp.timestamp.substring(0, 10));
     setEditLinkedVisionId(opp.linkedVisionId || '');
+    setEditDescription(opp.description || '');
   };
 
   // Save Inline Edits
@@ -186,11 +205,13 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
       category: editCategory,
       type: editType.trim(),
       companyOrClient: editCompanyOrClient.trim() || undefined,
+      expectedValue: editExpectedValue.trim() || undefined,
       points: editPoints,
       feedback: editFeedback.trim(),
       stage: editStage,
       timestamp: newTimestamp,
       linkedVisionId: editLinkedVisionId || undefined,
+      description: editDescription.trim() || undefined,
     });
     setEditingId(null);
   };
@@ -284,10 +305,12 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
         id: newPipelineId,
         title: `${opp.title} (${opp.type || 'Opportunity'})`,
         type: opp.category === 'Career' ? 'Job' : opp.category === 'Finance' ? 'Scholarship' : 'Custom',
+        companyOrClient: opp.companyOrClient,
+        expectedValue: opp.expectedValue,
         stages: presetStages,
         currentStageIndex: 0,
         status: 'active',
-        notes: `Automatically generated tracker connected to opportunity logged on ${new Date(opp.timestamp).toLocaleDateString()}.\n\nFeedback Log: ${opp.feedback || 'None yet'}`,
+        notes: `Automatically generated tracker connected to opportunity logged on ${new Date(opp.timestamp).toLocaleDateString()}.${opp.companyOrClient ? `\nTarget: ${opp.companyOrClient}` : ''}${opp.expectedValue ? `\nExpected Value: ${opp.expectedValue}` : ''}${opp.description ? `\n\nJob Description / Enquiry:\n${opp.description}` : ''}\n\nFeedback Log: ${opp.feedback || 'None yet'}`,
         category: opp.category,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -529,6 +552,17 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                             />
                           </div>
                           <div>
+                            <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Expected Salary / Grant / Value</label>
+                            <input
+                              id={`page-edit-expected-value-${opp.id}`}
+                              type="text"
+                              value={editExpectedValue}
+                              onChange={(e) => setEditExpectedValue(e.target.value)}
+                              placeholder="e.g. $120k/yr, KSh 500k, $15k grant"
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
+                            />
+                          </div>
+                          <div>
                             <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Subtype / Tag</label>
                             <input
                               id={`page-edit-type-${opp.id}`}
@@ -536,6 +570,17 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                               value={editType}
                               onChange={(e) => setEditType(e.target.value)}
                               className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Job Description / Enquiry</label>
+                            <textarea
+                              id={`page-edit-description-${opp.id}`}
+                              value={editDescription}
+                              onChange={(e) => setEditDescription(e.target.value)}
+                              placeholder="e.g. paste job description or enquiry details..."
+                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
+                              rows={2}
                             />
                           </div>
                           <div>
@@ -668,6 +713,20 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                             <span className="truncate max-w-[200px]" title={opp.companyOrClient}>
                               {opp.companyOrClient}
                             </span>
+                          </div>
+                        )}
+                        {opp.expectedValue && (
+                          <div className="mt-0.5 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1 font-sans">
+                            <Coins className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span className="truncate max-w-[200px]" title={opp.expectedValue}>
+                              {opp.expectedValue}
+                            </span>
+                          </div>
+                        )}
+                        {opp.description && (
+                          <div className="mt-1.5 text-[10px] text-sepia-650 dark:text-sepia-400 bg-cream-50/50 dark:bg-sepia-850/40 p-1.5 rounded border border-cream-100 dark:border-sepia-800/80 font-sans max-w-[240px] max-h-[85px] overflow-y-auto">
+                            <span className="font-bold block mb-0.5 text-sepia-550 dark:text-sepia-300">Details:</span>
+                            <FormattedText text={opp.description} />
                           </div>
                         )}
                         {opp.linkedVisionId && (
