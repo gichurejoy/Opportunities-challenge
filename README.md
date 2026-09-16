@@ -1,8 +1,6 @@
 # 1,000 Opportunities Challenge
 
-<div align="center">
-  <img width="1200" height="475" alt="1000 Opportunities Challenge" src="" />
-</div>
+
 
 > **Core Philosophy:** Your life changes when the number of proactive opportunities you create exceeds the number you wait for.
 
@@ -12,7 +10,8 @@ A productivity tracker that empowers you to log **1,000 high-leverage outbound a
 
 ## Features
 
-- 🔥 **Opportunity Logger** — Quickly log any proactive action with category, type, and description
+- 🔥 **Opportunity Logger** — Quickly log any proactive action with category, type, description, and expected value (salary / grant / deal amount)
+- 💰 **Expected Value Tracking** — Attach salary ranges, grant amounts, or contract values to any opportunity or pipeline item
 - 🗓️ **Heatmap** — GitHub-style activity heatmap of your daily logs
 - 📊 **Analytics** — Live funnel conversion metrics (Career, Business, Learning) calculated from your real data
 - 🎯 **Visions Roadmap** — Set and track long-term goals linked to your opportunity logs
@@ -22,7 +21,7 @@ A productivity tracker that empowers you to log **1,000 high-leverage outbound a
 - ✅ **Habit Checklist** — Daily discipline tracker (fitness, reading, coding)
 - 🏅 **Streaks** — Maintain multi-discipline streaks across career, fitness, savings, and coding
 - 💡 **AI Catalyst (One More)** — Gemini-powered personalized action suggestions based on your visions
-- 🗄️ **Data Vault** — Full export/import of your database as a JSON backup
+- 🗄️ **Data Vault** — Full export/import of your database as JSON or CSV spreadsheet
 - 🌙 **Dark / Light Mode** — Full theme support
 
 ---
@@ -46,7 +45,7 @@ A productivity tracker that empowers you to log **1,000 high-leverage outbound a
    npm run dev
    ```
 
-4. Open [http://localhost:5173](http://localhost:5173) in your browser.
+4. Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
@@ -65,6 +64,7 @@ A productivity tracker that empowers you to log **1,000 high-leverage outbound a
 ```
 src/
 ├── components/          # All UI panels (Logger, Heatmap, Pipeline, Visions...)
+│   └── FormattedText.tsx # Markdown-like text renderer (bold, italic, links, lists)
 ├── utils/
 │   └── localDb.ts       # localStorage persistence layer
 ├── types.ts             # TypeScript type definitions
