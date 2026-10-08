@@ -4,13 +4,15 @@
  */
 
 import React, { useState, useMemo, useRef } from 'react';
-import { Opportunity } from '../types';
-import { Search, Download, Upload, Trash2, SlidersHorizontal, Archive, RefreshCw, Edit2, Check, X, Building, FileSpreadsheet, Coins } from 'lucide-react';
+import { Opportunity, ChecklistHabit, isChecklistOpportunity, textToChecklistItems } from '../types';
+import { Search, Download, Upload, Trash2, SlidersHorizontal, Archive, RefreshCw, Edit2, Check, X, Building, FileSpreadsheet, Coins, CheckSquare, ListChecks, Calendar, GraduationCap, MessageSquare, FileText } from 'lucide-react';
 import { CATEGORY_METADATA } from './QuickLogger';
+import { getCategoryFieldConfig } from '../utils/categoryFields';
 import { FormattedText } from './FormattedText';
 
 interface VaultProps {
   opportunities: Opportunity[];
+  checklistHabits?: ChecklistHabit[];
   onImportVault: (data: any) => void;
   onClearVault: () => void;
   onDeleteOpportunity: (id: string) => void;
@@ -19,6 +21,7 @@ interface VaultProps {
 
 export const Vault: React.FC<VaultProps> = ({
   opportunities,
+  checklistHabits,
   onImportVault,
   onClearVault,
   onDeleteOpportunity,
@@ -39,12 +42,21 @@ export const Vault: React.FC<VaultProps> = ({
   const [editCompanyOrClient, setEditCompanyOrClient] = useState('');
   const [editExpectedValue, setEditExpectedValue] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editFeedback, setEditFeedback] = useState('');
+  const [editEligibility, setEditEligibility] = useState('');
+  const [editRequirements, setEditRequirements] = useState('');
+  const [editDeadline, setEditDeadline] = useState('');
 
   const ITEMS_PER_PAGE = 8;
 
+  // Filter out checklist habits from History & Backup view
+  const displayOpportunities = useMemo(() => {
+    return opportunities.filter((opp) => !isChecklistOpportunity(opp, checklistHabits));
+  }, [opportunities, checklistHabits]);
+
   // Filter and Search
   const filteredOpps = useMemo(() => {
-    return opportunities.filter((opp) => {
+    return displayOpportunities.filter((opp) => {
       const matchesSearch = opp.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
         (opp.companyOrClient && opp.companyOrClient.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (opp.expectedValue && opp.expectedValue.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -79,7 +91,7 @@ export const Vault: React.FC<VaultProps> = ({
 
   // Export database as clean CSV spreadsheet
   const handleExportCSV = () => {
-    if (opportunities.length === 0) {
+    if (displayOpportunities.length === 0) {
       alert('No opportunities to export.');
       return;
     }
@@ -96,7 +108,7 @@ export const Vault: React.FC<VaultProps> = ({
       'Notes / Description'
     ];
 
-    const rows = opportunities.map((opp) => [
+    const rows = displayOpportunities.map((opp) => [
       `"${(opp.title || '').replace(/"/g, '""')}"`,
       `"${(opp.companyOrClient || '').replace(/"/g, '""')}"`,
       `"${(opp.expectedValue || '').replace(/"/g, '""')}"`,
@@ -118,6 +130,44 @@ export const Vault: React.FC<VaultProps> = ({
     downloadAnchor.click();
     document.body.removeChild(downloadAnchor);
     URL.revokeObjectURL(url);
+  };
+
+  // Trigger download of stored file
+  const triggerDownload = (opp: Opportunity) => {
+    if (!opp.fileData || !opp.fileName) return;
+    const link = document.createElement('a');
+    link.href = opp.fileData;
+    link.download = opp.fileName;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Toggle Scholarship checklist items
+  const handleToggleEligibilityItem = (opp: Opportunity, itemId: string) => {
+    const currentList = opp.eligibilityChecklist && opp.eligibilityChecklist.length > 0
+      ? opp.eligibilityChecklist
+      : textToChecklistItems(opp.eligibility);
+    const updatedList = currentList.map((item) =>
+      item.id === itemId ? { ...item, completed: !item.completed } : item
+    );
+    onUpdateOpportunity({
+      ...opp,
+      eligibilityChecklist: updatedList,
+    });
+  };
+
+  const handleToggleRequirementItem = (opp: Opportunity, itemId: string) => {
+    const currentList = opp.requirementsChecklist && opp.requirementsChecklist.length > 0
+      ? opp.requirementsChecklist
+      : textToChecklistItems(opp.requirements);
+    const updatedList = currentList.map((item) =>
+      item.id === itemId ? { ...item, completed: !item.completed } : item
+    );
+    onUpdateOpportunity({
+      ...opp,
+      requirementsChecklist: updatedList,
+    });
   };
 
   // Import database from JSON file
@@ -279,45 +329,120 @@ export const Vault: React.FC<VaultProps> = ({
                 ) : (
                   paginatedOpps.map((opp) => {
                     const isEditing = editingOppId === opp.id;
+                        const vaultFieldConfig = isEditing ? getCategoryFieldConfig(editCategory) : null;
                     const meta = CATEGORY_METADATA[opp.category] || CATEGORY_METADATA.Career;
                     const Icon = meta.icon;
 
                     if (isEditing) {
                       return (
                         <tr key={opp.id} className="bg-cream-50/70 dark:bg-sepia-800/20 border-l-2 border-readflow-green">
-                          <td className="p-2">
-                            <input
-                              id={`vault-edit-title-${opp.id}`}
-                              type="text"
-                              value={editTitle}
-                              onChange={(e) => setEditTitle(e.target.value)}
-                              className="w-full px-2 py-1 text-xs rounded border border-cream-300 dark:border-sepia-700 bg-white dark:bg-sepia-900 text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
-                              placeholder="Action title"
-                            />
-                            <input
-                              id={`vault-edit-company-${opp.id}`}
-                              type="text"
-                              value={editCompanyOrClient}
-                              onChange={(e) => setEditCompanyOrClient(e.target.value)}
-                              className="w-full mt-1 px-2 py-0.5 text-[10px] rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
-                              placeholder="Company/Client (optional)"
-                            />
-                            <input
-                              id={`vault-edit-expected-value-${opp.id}`}
-                              type="text"
-                              value={editExpectedValue}
-                              onChange={(e) => setEditExpectedValue(e.target.value)}
-                              className="w-full mt-1 px-2 py-0.5 text-[10px] rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
-                              placeholder="Expected salary/grant/value (optional)"
-                            />
-                            <textarea
-                              id={`vault-edit-description-${opp.id}`}
-                              value={editDescription}
-                              onChange={(e) => setEditDescription(e.target.value)}
-                              className="w-full mt-1 px-2 py-0.5 text-[10px] rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
-                              placeholder="Job Description/Enquiry (optional)"
-                              rows={1}
-                            />
+                          <td className="p-2 space-y-2">
+                            <div>
+                              <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Action Title</label>
+                              <input
+                                id={`vault-edit-title-${opp.id}`}
+                                type="text"
+                                value={editTitle}
+                                onChange={(e) => setEditTitle(e.target.value)}
+                                className="w-full px-2 py-1 text-xs rounded border border-cream-300 dark:border-sepia-700 bg-white dark:bg-sepia-900 text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
+                                placeholder="Action title"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">{vaultFieldConfig?.entityLabel.replace(' (Optional)', '') || 'Target Entity'}</label>
+                              <input
+                                id={`vault-edit-company-${opp.id}`}
+                                type="text"
+                                value={editCompanyOrClient}
+                                onChange={(e) => setEditCompanyOrClient(e.target.value)}
+                                className="w-full px-2 py-1 text-xs rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
+                                placeholder={vaultFieldConfig?.entityLabel || "Entity (optional)"}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">{vaultFieldConfig?.valueLabel.replace(' (Optional)', '') || 'Expected Value'}</label>
+                              <input
+                                id={`vault-edit-expected-value-${opp.id}`}
+                                type="text"
+                                value={editExpectedValue}
+                                onChange={(e) => setEditExpectedValue(e.target.value)}
+                                className="w-full px-2 py-1 text-xs rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
+                                placeholder={vaultFieldConfig?.valueLabel || "Expected value (optional)"}
+                              />
+                            </div>
+
+                            {editCategory === 'Scholarships' ? (
+                              <div className="space-y-2 p-2 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-150 dark:border-blue-900/40">
+                                <div>
+                                  <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Eligibility Criteria (1 per line)</label>
+                                  <textarea
+                                    id={`vault-edit-eligibility-${opp.id}`}
+                                    value={editEligibility}
+                                    onChange={(e) => setEditEligibility(e.target.value)}
+                                    placeholder="e.g. Min 3.5 GPA&#10;Under 30 years old"
+                                    className="w-full px-2 py-1 text-xs rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
+                                    rows={2}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Requirements (1 per line)</label>
+                                  <textarea
+                                    id={`vault-edit-requirements-${opp.id}`}
+                                    value={editRequirements}
+                                    onChange={(e) => setEditRequirements(e.target.value)}
+                                    placeholder="e.g. Transcripts&#10;SOP"
+                                    className="w-full px-2 py-1 text-xs rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
+                                    rows={2}
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Deadline</label>
+                                  <input
+                                    id={`vault-edit-deadline-${opp.id}`}
+                                    type="text"
+                                    value={editDeadline}
+                                    onChange={(e) => setEditDeadline(e.target.value)}
+                                    placeholder="e.g. Nov 15, 2026"
+                                    className="w-full px-2 py-1 text-xs rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans"
+                                  />
+                                </div>
+                                <div>
+                                  <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Additional Notes</label>
+                                  <textarea
+                                    id={`vault-edit-description-${opp.id}`}
+                                    value={editDescription}
+                                    onChange={(e) => setEditDescription(e.target.value)}
+                                    placeholder="Additional notes..."
+                                    className="w-full px-2 py-1 text-xs rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
+                                    rows={2}
+                                  />
+                                </div>
+                              </div>
+                            ) : (
+                              <div>
+                                <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">{vaultFieldConfig?.detailsLabel.replace(' (Optional)', '') || 'Details & Notes'}</label>
+                                <textarea
+                                  id={`vault-edit-description-${opp.id}`}
+                                  value={editDescription}
+                                  onChange={(e) => setEditDescription(e.target.value)}
+                                  className="w-full px-2 py-1 text-xs rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
+                                  placeholder={vaultFieldConfig?.detailsLabel || "Details (optional)"}
+                                  rows={2}
+                                />
+                              </div>
+                            )}
+
+                            <div>
+                              <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Feedback / Qualitative Reflections</label>
+                              <textarea
+                                id={`vault-edit-feedback-${opp.id}`}
+                                value={editFeedback}
+                                onChange={(e) => setEditFeedback(e.target.value)}
+                                placeholder="Add qualitative reflections or feedback..."
+                                className="w-full px-2 py-1 text-xs rounded border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
+                                rows={2}
+                              />
+                            </div>
                           </td>
                           <td className="p-2">
                             <select
@@ -371,6 +496,14 @@ export const Vault: React.FC<VaultProps> = ({
                                   const timePart = opp.timestamp.includes('T') ? opp.timestamp.split('T')[1] : '12:00:00.000Z';
                                   const newTimestamp = editTimestamp ? `${editTimestamp}T${timePart}` : opp.timestamp;
 
+                                  const isScholarship = editCategory === 'Scholarships';
+                                  const eligibilityChecklist = isScholarship && editEligibility.trim()
+                                    ? textToChecklistItems(editEligibility)
+                                    : isScholarship ? opp.eligibilityChecklist : undefined;
+                                  const requirementsChecklist = isScholarship && editRequirements.trim()
+                                    ? textToChecklistItems(editRequirements)
+                                    : isScholarship ? opp.requirementsChecklist : undefined;
+
                                   onUpdateOpportunity({
                                     ...opp,
                                     title: editTitle.trim(),
@@ -381,6 +514,12 @@ export const Vault: React.FC<VaultProps> = ({
                                     companyOrClient: editCompanyOrClient.trim() || undefined,
                                     expectedValue: editExpectedValue.trim() || undefined,
                                     description: editDescription.trim() || undefined,
+                                    feedback: editFeedback.trim() || undefined,
+                                    eligibility: isScholarship ? editEligibility.trim() || undefined : opp.eligibility,
+                                    requirements: isScholarship ? editRequirements.trim() || undefined : opp.requirements,
+                                    deadline: isScholarship ? editDeadline.trim() || undefined : opp.deadline,
+                                    eligibilityChecklist,
+                                    requirementsChecklist,
                                   });
                                   setEditingOppId(null);
                                 }}
@@ -405,46 +544,179 @@ export const Vault: React.FC<VaultProps> = ({
 
                     return (
                       <tr key={opp.id} className="hover:bg-cream-50/50 dark:hover:bg-sepia-800/10 transition-colors">
-                        <td className="p-3 font-semibold text-sepia-800 dark:text-cream-100 max-w-[200px] truncate">
-                          <div className="truncate" title={opp.title}>{opp.title}</div>
+                        <td className="p-3.5 align-top">
+                          <div className="font-bold text-sepia-850 dark:text-cream-50 text-sm leading-snug">
+                            {opp.title}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] text-sepia-450 dark:text-sepia-500 font-medium font-sans">
+                            <span className="font-mono bg-cream-100 dark:bg-sepia-850 px-1.5 py-0.5 rounded text-sepia-700 dark:text-cream-200 border border-cream-200/50 dark:border-sepia-800">
+                              {opp.type || 'generic'}
+                            </span>
+                            <span>•</span>
+                            <span className="font-mono">{new Date(opp.timestamp).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                          </div>
+
                           {opp.companyOrClient && (
-                            <div className="mt-1 text-[10px] text-amber-800 dark:text-amber-300 font-semibold flex items-center gap-1 font-sans">
-                              <Building className="w-3 h-3 text-amber-600 dark:text-amber-450 shrink-0" />
-                              <span className="truncate max-w-[170px]" title={opp.companyOrClient}>
-                                {opp.companyOrClient}
-                              </span>
+                            <div className="mt-1.5 text-xs text-amber-900 dark:text-amber-300 font-semibold flex items-center gap-1.5 font-sans">
+                              <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span>{opp.companyOrClient}</span>
                             </div>
                           )}
+
                           {opp.expectedValue && (
-                            <div className="mt-0.5 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1 font-sans">
-                              <Coins className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                              <span className="truncate max-w-[170px]" title={opp.expectedValue}>
-                                {opp.expectedValue}
-                              </span>
+                            <div className="mt-1 text-xs text-emerald-800 dark:text-emerald-300 font-semibold flex items-center gap-1.5 font-sans">
+                              <Coins className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              <span>{opp.expectedValue}</span>
                             </div>
                           )}
+
+                          {/* SCHOLARSHIP SECTION: Eligibility Checklist, Requirements Checklist & Deadline */}
+                          {opp.category === 'Scholarships' && (() => {
+                            const eligibilityItems = opp.eligibilityChecklist && opp.eligibilityChecklist.length > 0
+                              ? opp.eligibilityChecklist
+                              : opp.eligibility
+                              ? textToChecklistItems(opp.eligibility)
+                              : [];
+                            const requirementsItems = opp.requirementsChecklist && opp.requirementsChecklist.length > 0
+                              ? opp.requirementsChecklist
+                              : opp.requirements
+                              ? textToChecklistItems(opp.requirements)
+                              : [];
+
+                            return (
+                              <div className="mt-2.5 space-y-2">
+                                {opp.deadline && (
+                                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 border border-amber-200/80 dark:border-amber-800/50">
+                                    <Calendar className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                                    <span>Deadline: <strong className="font-mono">{opp.deadline}</strong></span>
+                                  </div>
+                                )}
+
+                                {/* Eligibility Checklist */}
+                                <div className="p-2 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-150 dark:border-blue-900/40">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <div className="text-[10px] font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1">
+                                      <CheckSquare className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                                      <span>Eligibility Criteria Checklist</span>
+                                    </div>
+                                    <span className="text-[9px] font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 px-1 rounded">
+                                      {eligibilityItems.filter((i) => i.completed).length}/{eligibilityItems.length} Met
+                                    </span>
+                                  </div>
+                                  {eligibilityItems.length === 0 ? (
+                                    <p className="text-[10px] text-sepia-400 italic">No eligibility criteria logged.</p>
+                                  ) : (
+                                    <div className="space-y-0.5">
+                                      {eligibilityItems.map((item) => (
+                                        <label
+                                          key={item.id}
+                                          className="flex items-start gap-1.5 p-0.5 rounded hover:bg-white/60 dark:hover:bg-sepia-900/40 transition-colors cursor-pointer text-xs"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={item.completed}
+                                            onChange={() => handleToggleEligibilityItem(opp, item.id)}
+                                            className="mt-0.5 accent-blue-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
+                                          />
+                                          <span className={item.completed ? 'line-through text-sepia-400 dark:text-sepia-500 font-normal' : 'text-sepia-800 dark:text-cream-100 font-medium'}>
+                                            {item.text}
+                                          </span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+
+                                {/* Requirements Checklist */}
+                                <div className="p-2 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-150 dark:border-indigo-900/40">
+                                  <div className="flex items-center justify-between gap-2 mb-1">
+                                    <div className="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1">
+                                      <ListChecks className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                                      <span>Application Requirements Checklist</span>
+                                    </div>
+                                    <span className="text-[9px] font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-1 rounded">
+                                      {requirementsItems.filter((i) => i.completed).length}/{requirementsItems.length} Ready
+                                    </span>
+                                  </div>
+                                  {requirementsItems.length === 0 ? (
+                                    <p className="text-[10px] text-sepia-400 italic">No requirements logged.</p>
+                                  ) : (
+                                    <div className="space-y-0.5">
+                                      {requirementsItems.map((item) => (
+                                        <label
+                                          key={item.id}
+                                          className="flex items-start gap-1.5 p-0.5 rounded hover:bg-white/60 dark:hover:bg-sepia-900/40 transition-colors cursor-pointer text-xs"
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            checked={item.completed}
+                                            onChange={() => handleToggleRequirementItem(opp, item.id)}
+                                            className="mt-0.5 accent-indigo-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
+                                          />
+                                          <span className={item.completed ? 'line-through text-sepia-400 dark:text-sepia-500 font-normal' : 'text-sepia-800 dark:text-cream-100 font-medium'}>
+                                            {item.text}
+                                          </span>
+                                        </label>
+                                      ))}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Full Description & Notes */}
                           {opp.description && (
-                            <div className="mt-1 text-[10px] text-sepia-650 dark:text-sepia-400 bg-cream-50/50 dark:bg-sepia-850/40 px-1.5 py-1 rounded border border-cream-100 dark:border-sepia-800/80 font-sans max-w-[180px] max-h-[60px] overflow-y-auto">
+                            <div className="mt-2 text-xs text-sepia-700 dark:text-sepia-300 bg-cream-50/70 dark:bg-sepia-850/60 p-2 rounded-lg border border-cream-200/70 dark:border-sepia-800 font-sans leading-relaxed">
+                              <span className="font-bold block mb-0.5 text-[9px] uppercase font-mono tracking-wider text-sepia-450 dark:text-sepia-400">
+                                {opp.category === 'Scholarships' ? 'Additional Notes & Prompts:' : 'Details & Scope:'}
+                              </span>
                               <FormattedText text={opp.description} />
                             </div>
                           )}
+
+                          {/* Full Qualitative Feedback */}
+                          {opp.feedback && (
+                            <div className="mt-1.5 text-xs text-sepia-800 dark:text-cream-200 bg-amber-50/50 dark:bg-amber-950/20 p-2 rounded-lg border border-amber-200/60 dark:border-amber-900/30 flex items-start gap-1.5 font-sans">
+                              <MessageSquare className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                              <div>
+                                <span className="font-bold block text-[9px] uppercase font-mono tracking-wider text-amber-800 dark:text-amber-400">Feedback / Reflection:</span>
+                                <span>{opp.feedback}</span>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Stored Attachment */}
+                          {opp.fileName && (
+                            <div className="mt-1.5 inline-flex items-center gap-1.5 bg-cream-50 dark:bg-sepia-850 px-2 py-1 rounded-md border border-cream-200 dark:border-sepia-800 text-[11px] font-sans">
+                              <FileText className="w-3.5 h-3.5 text-readflow-green shrink-0" />
+                              <span className="font-bold text-sepia-800 dark:text-cream-200">{opp.fileName}</span>
+                              <button
+                                onClick={() => triggerDownload(opp)}
+                                className="text-xs text-readflow-green hover:underline cursor-pointer flex items-center gap-0.5 ml-1"
+                                title="Download attachment"
+                              >
+                                <Download className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
                         </td>
-                        <td className="p-3">
+                        <td className="p-3.5 align-top">
                           <span className={`inline-flex items-center gap-1 font-bold ${meta.text}`}>
                             <Icon className="w-3.5 h-3.5" />
                             {opp.category}
                           </span>
                         </td>
-                        <td className="p-3 text-sepia-400 dark:text-sepia-500 font-semibold">
+                        <td className="p-3.5 align-top text-sepia-400 dark:text-sepia-500 font-semibold">
                           {opp.type}
                         </td>
-                        <td className="p-3 text-right font-mono font-bold text-sepia-800 dark:text-cream-100">
+                        <td className="p-3.5 align-top text-right font-mono font-bold text-sepia-800 dark:text-cream-100">
                           +{opp.points}
                         </td>
-                        <td className="p-3 text-right text-sepia-400 dark:text-sepia-500 font-medium">
+                        <td className="p-3.5 align-top text-right text-sepia-400 dark:text-sepia-500 font-medium">
                           {new Date(opp.timestamp).toLocaleDateString()}
                         </td>
-                        <td className="p-3 text-center">
+                        <td className="p-3.5 align-top text-center">
                           <div className="flex items-center justify-center gap-1.5">
                             <button
                               id={`vault-edit-btn-${opp.id}`}
@@ -458,6 +730,16 @@ export const Vault: React.FC<VaultProps> = ({
                                 setEditCompanyOrClient(opp.companyOrClient || '');
                                 setEditExpectedValue(opp.expectedValue || '');
                                 setEditDescription(opp.description || '');
+                                setEditFeedback(opp.feedback || '');
+                                setEditEligibility(
+                                  opp.eligibility ||
+                                  (opp.eligibilityChecklist ? opp.eligibilityChecklist.map((i) => i.text).join('\n') : '')
+                                );
+                                setEditRequirements(
+                                  opp.requirements ||
+                                  (opp.requirementsChecklist ? opp.requirementsChecklist.map((i) => i.text).join('\n') : '')
+                                );
+                                setEditDeadline(opp.deadline || '');
                               }}
                               className="text-sepia-400 hover:text-readflow-green p-1 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all cursor-pointer"
                               title="Edit record"

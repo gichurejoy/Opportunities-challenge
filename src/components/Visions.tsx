@@ -29,7 +29,7 @@ export const Visions: React.FC<VisionsProps> = ({
   const [newTargetPoints, setNewTargetPoints] = useState(100);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
 
-  const CATEGORIES = ['Career', 'Business', 'Learning', 'Finance', 'Health', 'Personal', 'Side Projects', 'Farming'];
+  const CATEGORIES = ['Career', 'Side Work', 'Scholarships', 'Business', 'Learning', 'Finance', 'Health', 'Personal', 'Side Projects', 'Farming'];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

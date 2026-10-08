@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { localDb, AppState } from './utils/localDb';
-import { Opportunity, OpportunityPipeline, ScoreConfig, Vision, ChecklistHabit, NudgeConfig } from './types';
+import { Opportunity, OpportunityPipeline, ScoreConfig, Vision, ChecklistHabit, NudgeConfig, isChecklistOpportunity } from './types';
 import { QuickLogger } from './components/QuickLogger';
 import { Inspiration } from './components/Inspiration';
 import { Heatmap } from './components/Heatmap';
@@ -569,15 +569,22 @@ export default function App() {
     );
   }
 
-  // Filter today's opportunities logs
+  // Filter today's opportunities logs (using LOCAL date to avoid UTC timezone mismatch)
+  const getLocalDateStr = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+  const todayLocalStr = getLocalDateStr(new Date());
   const todayOpportunities = state.opportunities.filter((opp) => {
-    const oppDate = opp.timestamp.split('T')[0];
-    const todayStr = new Date().toISOString().split('T')[0];
-    return oppDate === todayStr;
+    return getLocalDateStr(new Date(opp.timestamp)) === todayLocalStr;
   });
 
   const totalOppsCount = state.opportunities.length;
   const challengeProgressPercent = Math.min(100, Math.round((totalOppsCount / 1000) * 100));
+  // Count only true opportunities (excluding checklist habits) for Logbook badge
+  const logbookOpportunitiesCount = state.opportunities.filter((opp) => !isChecklistOpportunity(opp, state.checklistHabits)).length;
 
   // Authentication Guard: Require sign in / creation to access dashboard
   if (!currentUser) {
@@ -777,7 +784,7 @@ export default function App() {
             <ClipboardList className="w-4 h-4" />
             Opportunities Logbook
             <span className="bg-cream-150 dark:bg-sepia-850 text-sepia-600 dark:text-cream-200 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">
-              {state.opportunities.length}
+              {logbookOpportunitiesCount}
             </span>
           </button>
           <button
@@ -939,6 +946,7 @@ export default function App() {
                 {activeBottomTab === 'vault' ? (
                   <Vault
                     opportunities={state.opportunities}
+                    checklistHabits={state.checklistHabits || []}
                     onImportVault={handleImportVault}
                     onClearVault={handleClearVault}
                     onDeleteOpportunity={handleDeleteOpportunity}
@@ -1001,6 +1009,7 @@ export default function App() {
             opportunities={state.opportunities}
             pipelines={state.pipelines}
             visions={state.visions}
+            checklistHabits={state.checklistHabits || []}
             onUpdateOpportunity={handleUpdateOpportunity}
             onDeleteOpportunity={handleDeleteOpportunity}
             onAddPipeline={handleAddPipeline}

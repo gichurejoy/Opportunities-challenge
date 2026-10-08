@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Opportunity, OpportunityPipeline, Vision } from '../types';
+import { Opportunity, OpportunityPipeline, Vision, ChecklistHabit, isChecklistOpportunity, textToChecklistItems } from '../types';
 import {
   Search,
   Filter,
@@ -21,15 +21,21 @@ import {
   ChevronRight,
   MessageSquare,
   Building,
-  Coins
+  Coins,
+  CheckSquare,
+  ListChecks,
+  Calendar,
+  GraduationCap
 } from 'lucide-react';
 import { CATEGORY_METADATA } from './QuickLogger';
+import { getCategoryFieldConfig } from '../utils/categoryFields';
 import { FormattedText } from './FormattedText';
 
 interface OpportunitiesLogbookProps {
   opportunities: Opportunity[];
   pipelines: OpportunityPipeline[];
   visions: Vision[];
+  checklistHabits?: ChecklistHabit[];
   onUpdateOpportunity: (updatedOpp: Opportunity) => void;
   onDeleteOpportunity: (id: string) => void;
   onAddPipeline: (newPipe: Omit<OpportunityPipeline, 'id' | 'createdAt' | 'updatedAt'>) => void;
@@ -53,6 +59,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   opportunities,
   pipelines,
   visions,
+  checklistHabits,
   onUpdateOpportunity,
   onDeleteOpportunity,
   onAddPipeline,
@@ -80,18 +87,26 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   const [editDate, setEditDate] = useState('');
   const [editLinkedVisionId, setEditLinkedVisionId] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editEligibility, setEditEligibility] = useState('');
+  const [editRequirements, setEditRequirements] = useState('');
+  const [editDeadline, setEditDeadline] = useState('');
 
   // Drag and drop / upload refs
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
 
+  // Exclude checklist habits from Opportunities Logbook
+  const logbookOpportunities = React.useMemo(() => {
+    return opportunities.filter((opp) => !isChecklistOpportunity(opp, checklistHabits));
+  }, [opportunities, checklistHabits]);
+
   // Statistics
-  const totalPoints = opportunities.reduce((sum, o) => sum + o.points, 0);
-  const totalFiles = opportunities.filter((o) => o.fileName).length;
-  const activePipelineLinks = opportunities.filter((o) => o.pipelineId).length;
+  const totalPoints = logbookOpportunities.reduce((sum, o) => sum + o.points, 0);
+  const totalFiles = logbookOpportunities.filter((o) => o.fileName).length;
+  const activePipelineLinks = logbookOpportunities.filter((o) => o.pipelineId).length;
 
   // Filtered and sorted opportunities
-  const filteredOpps = opportunities.filter((opp) => {
+  const filteredOpps = logbookOpportunities.filter((opp) => {
     const matchesSearch = opp.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                           (opp.companyOrClient && opp.companyOrClient.toLowerCase().includes(searchQuery.toLowerCase())) ||
                           (opp.expectedValue && opp.expectedValue.toLowerCase().includes(searchQuery.toLowerCase())) ||
@@ -148,7 +163,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
       'Logged Date',
       'Linked Vision/Goal ID'
     ];
-    const rows = opportunities.map((opp) => [
+    const rows = logbookOpportunities.map((opp) => [
       `"${opp.title.replace(/"/g, '""')}"`,
       `"${(opp.companyOrClient || '').replace(/"/g, '""')}"`,
       `"${(opp.expectedValue || '').replace(/"/g, '""')}"`,
@@ -187,6 +202,15 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
     setEditDate(opp.timestamp.substring(0, 10));
     setEditLinkedVisionId(opp.linkedVisionId || '');
     setEditDescription(opp.description || '');
+    setEditEligibility(
+      opp.eligibility ||
+      (opp.eligibilityChecklist ? opp.eligibilityChecklist.map((i) => i.text).join('\n') : '')
+    );
+    setEditRequirements(
+      opp.requirements ||
+      (opp.requirementsChecklist ? opp.requirementsChecklist.map((i) => i.text).join('\n') : '')
+    );
+    setEditDeadline(opp.deadline || '');
   };
 
   // Save Inline Edits
@@ -198,6 +222,14 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
 
     const timePart = opp.timestamp.includes('T') ? opp.timestamp.split('T')[1] : '12:00:00.000Z';
     const newTimestamp = editDate ? `${editDate}T${timePart}` : opp.timestamp;
+
+    const isScholarship = editCategory === 'Scholarships';
+    const eligibilityChecklist = isScholarship && editEligibility.trim()
+      ? textToChecklistItems(editEligibility)
+      : isScholarship ? opp.eligibilityChecklist : undefined;
+    const requirementsChecklist = isScholarship && editRequirements.trim()
+      ? textToChecklistItems(editRequirements)
+      : isScholarship ? opp.requirementsChecklist : undefined;
 
     onUpdateOpportunity({
       ...opp,
@@ -212,8 +244,40 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
       timestamp: newTimestamp,
       linkedVisionId: editLinkedVisionId || undefined,
       description: editDescription.trim() || undefined,
+      eligibility: isScholarship ? editEligibility.trim() || undefined : opp.eligibility,
+      requirements: isScholarship ? editRequirements.trim() || undefined : opp.requirements,
+      deadline: isScholarship ? editDeadline.trim() || undefined : opp.deadline,
+      eligibilityChecklist,
+      requirementsChecklist,
     });
     setEditingId(null);
+  };
+
+  // Toggle Scholarship checklist items
+  const handleToggleEligibilityItem = (opp: Opportunity, itemId: string) => {
+    const currentList = opp.eligibilityChecklist && opp.eligibilityChecklist.length > 0
+      ? opp.eligibilityChecklist
+      : textToChecklistItems(opp.eligibility);
+    const updatedList = currentList.map((item) =>
+      item.id === itemId ? { ...item, completed: !item.completed } : item
+    );
+    onUpdateOpportunity({
+      ...opp,
+      eligibilityChecklist: updatedList,
+    });
+  };
+
+  const handleToggleRequirementItem = (opp: Opportunity, itemId: string) => {
+    const currentList = opp.requirementsChecklist && opp.requirementsChecklist.length > 0
+      ? opp.requirementsChecklist
+      : textToChecklistItems(opp.requirements);
+    const updatedList = currentList.map((item) =>
+      item.id === itemId ? { ...item, completed: !item.completed } : item
+    );
+    onUpdateOpportunity({
+      ...opp,
+      requirementsChecklist: updatedList,
+    });
   };
 
   // Quick feedback save (blur or enter key)
@@ -522,6 +586,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
               ) : (
                 paginatedOpps.map((opp) => {
                   const isEditing = editingId === opp.id;
+                        const editFieldConfig = isEditing ? getCategoryFieldConfig(editCategory) : null;
                   const meta = CATEGORY_METADATA[opp.category] || CATEGORY_METADATA.Career;
                   const Icon = meta.icon;
 
@@ -541,24 +606,24 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                             />
                           </div>
                           <div>
-                            <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Target Company / Client</label>
+                            <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">{editFieldConfig?.entityLabel.replace(' (Optional)', '') || 'Target Entity'}</label>
                             <input
                               id={`page-edit-company-${opp.id}`}
                               type="text"
                               value={editCompanyOrClient}
                               onChange={(e) => setEditCompanyOrClient(e.target.value)}
-                              placeholder="e.g. Google, Acme Corp, Client John"
+                              placeholder={editFieldConfig?.entityPlaceholder || 'Target Entity'}
                               className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
                             />
                           </div>
                           <div>
-                            <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Expected Salary / Grant / Value</label>
+                            <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">{editFieldConfig?.valueLabel.replace(' (Optional)', '') || 'Expected Value'}</label>
                             <input
                               id={`page-edit-expected-value-${opp.id}`}
                               type="text"
                               value={editExpectedValue}
                               onChange={(e) => setEditExpectedValue(e.target.value)}
-                              placeholder="e.g. $120k/yr, KSh 500k, $15k grant"
+                              placeholder={editFieldConfig?.valuePlaceholder || 'Expected Value'}
                               className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
                             />
                           </div>
@@ -572,17 +637,70 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                               className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
                             />
                           </div>
-                          <div>
-                            <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Job Description / Enquiry</label>
-                            <textarea
-                              id={`page-edit-description-${opp.id}`}
-                              value={editDescription}
-                              onChange={(e) => setEditDescription(e.target.value)}
-                              placeholder="e.g. paste job description or enquiry details..."
-                              className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
-                              rows={2}
-                            />
-                          </div>
+                          {editCategory === 'Scholarships' ? (
+                            <div className="space-y-2 p-2.5 rounded-lg bg-blue-50/50 dark:bg-blue-950/20 border border-blue-150 dark:border-blue-900/40">
+                              <div className="text-[10px] font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1">
+                                <GraduationCap className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                Scholarship Criteria & Checklists
+                              </div>
+                              <div>
+                                <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Eligibility Criteria (Checklist - 1 per line)</label>
+                                <textarea
+                                  id={`page-edit-eligibility-${opp.id}`}
+                                  value={editEligibility}
+                                  onChange={(e) => setEditEligibility(e.target.value)}
+                                  placeholder="e.g. Min 3.5 GPA&#10;Under 30 years old"
+                                  className="w-full px-2.5 py-1 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
+                                  rows={2}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Application Requirements (Checklist - 1 per line)</label>
+                                <textarea
+                                  id={`page-edit-requirements-${opp.id}`}
+                                  value={editRequirements}
+                                  onChange={(e) => setEditRequirements(e.target.value)}
+                                  placeholder="e.g. Transcripts&#10;SOP&#10;2 Recommendation Letters"
+                                  className="w-full px-2.5 py-1 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
+                                  rows={2}
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Application Deadline</label>
+                                <input
+                                  id={`page-edit-deadline-${opp.id}`}
+                                  type="text"
+                                  value={editDeadline}
+                                  onChange={(e) => setEditDeadline(e.target.value)}
+                                  placeholder="e.g. Nov 15, 2026 or 2026-11-15"
+                                  className="w-full px-2.5 py-1 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Additional Notes / Essay Prompts</label>
+                                <textarea
+                                  id={`page-edit-description-${opp.id}`}
+                                  value={editDescription}
+                                  onChange={(e) => setEditDescription(e.target.value)}
+                                  placeholder="Essay prompts, application link, notes..."
+                                  className="w-full px-2.5 py-1 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
+                                  rows={2}
+                                />
+                              </div>
+                            </div>
+                          ) : (
+                            <div>
+                              <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">{editFieldConfig?.detailsLabel.replace(' (Optional)', '') || 'Details & Notes'}</label>
+                              <textarea
+                                id={`page-edit-description-${opp.id}`}
+                                value={editDescription}
+                                onChange={(e) => setEditDescription(e.target.value)}
+                                placeholder={editFieldConfig?.detailsPlaceholder || 'Details & Notes'}
+                                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans"
+                                rows={2}
+                              />
+                            </div>
+                          )}
                           <div>
                             <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Linked Vision / Goal</label>
                             <select
@@ -696,51 +814,148 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                       className="hover:bg-cream-50/45 dark:hover:bg-sepia-800/10 transition-colors"
                     >
                       {/* Details Column */}
-                      <td className="p-4">
-                        <div className="font-bold text-sepia-850 dark:text-cream-50 text-sm max-w-[240px] truncate" title={opp.title}>
+                      <td className="p-4 align-top">
+                        <div className="font-bold text-sepia-850 dark:text-cream-50 text-sm leading-snug">
                           {opp.title}
                         </div>
-                        <div className="flex items-center gap-2 mt-1 text-[10px] text-sepia-450 dark:text-sepia-500 font-medium font-sans">
-                          <span className="font-mono bg-cream-100 dark:bg-sepia-850 px-1.5 py-0.5 rounded">
+                        <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] text-sepia-450 dark:text-sepia-500 font-medium font-sans">
+                          <span className="font-mono bg-cream-100 dark:bg-sepia-850 px-1.5 py-0.5 rounded text-sepia-700 dark:text-cream-200 border border-cream-200/50 dark:border-sepia-800">
                             {opp.type || 'generic'}
                           </span>
                           <span>•</span>
-                          <span>{new Date(opp.timestamp).toLocaleDateString()}</span>
+                          <span className="font-mono">{new Date(opp.timestamp).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                          {opp.linkedVisionId && (
+                            <>
+                              <span>•</span>
+                              <span className="text-readflow-green dark:text-readflow-lightgreen font-bold flex items-center gap-1 font-sans">
+                                <TrendingUp className="w-3 h-3 text-readflow-green/80" />
+                                Goal: {visions.find((v) => v.id === opp.linkedVisionId)?.title || 'Linked Goal'}
+                              </span>
+                            </>
+                          )}
                         </div>
+
                         {opp.companyOrClient && (
-                          <div className="mt-1 text-[10px] text-amber-800 dark:text-amber-300 font-semibold flex items-center gap-1 font-sans">
-                            <Building className="w-3 h-3 text-amber-600 shrink-0" />
-                            <span className="truncate max-w-[200px]" title={opp.companyOrClient}>
-                              {opp.companyOrClient}
-                            </span>
+                          <div className="mt-1.5 text-xs text-amber-900 dark:text-amber-300 font-semibold flex items-center gap-1.5 font-sans">
+                            <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                            <span>{opp.companyOrClient}</span>
                           </div>
                         )}
+
                         {opp.expectedValue && (
-                          <div className="mt-0.5 text-[10px] text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1 font-sans">
-                            <Coins className="w-3 h-3 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                            <span className="truncate max-w-[200px]" title={opp.expectedValue}>
-                              {opp.expectedValue}
-                            </span>
+                          <div className="mt-1 text-xs text-emerald-800 dark:text-emerald-300 font-semibold flex items-center gap-1.5 font-sans">
+                            <Coins className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                            <span>{opp.expectedValue}</span>
                           </div>
                         )}
+
+                        {/* SCHOLARSHIP SECTION: Eligibility Checklist, Requirements Checklist & Deadline */}
+                        {opp.category === 'Scholarships' && (() => {
+                          const eligibilityItems = opp.eligibilityChecklist && opp.eligibilityChecklist.length > 0
+                            ? opp.eligibilityChecklist
+                            : opp.eligibility
+                            ? textToChecklistItems(opp.eligibility)
+                            : [];
+                          const requirementsItems = opp.requirementsChecklist && opp.requirementsChecklist.length > 0
+                            ? opp.requirementsChecklist
+                            : opp.requirements
+                            ? textToChecklistItems(opp.requirements)
+                            : [];
+
+                          return (
+                            <div className="mt-3 space-y-2.5">
+                              {opp.deadline && (
+                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 border border-amber-200/80 dark:border-amber-800/50">
+                                  <Calendar className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                  <span>Deadline: <strong className="font-mono">{opp.deadline}</strong></span>
+                                </div>
+                              )}
+
+                              {/* Interactive Eligibility Checklist */}
+                              <div className="p-2.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-150 dark:border-blue-900/40">
+                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                  <div className="text-[11px] font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                                    <CheckSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                    <span>Eligibility Criteria Checklist</span>
+                                  </div>
+                                  <span className="text-[10px] font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">
+                                    {eligibilityItems.filter((i) => i.completed).length}/{eligibilityItems.length} Met
+                                  </span>
+                                </div>
+                                {eligibilityItems.length === 0 ? (
+                                  <p className="text-[10px] text-sepia-400 italic">No eligibility criteria logged yet.</p>
+                                ) : (
+                                  <div className="space-y-1">
+                                    {eligibilityItems.map((item) => (
+                                      <label
+                                        key={item.id}
+                                        className="flex items-start gap-2 p-1 rounded hover:bg-white/60 dark:hover:bg-sepia-900/40 transition-colors cursor-pointer text-xs"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={item.completed}
+                                          onChange={() => handleToggleEligibilityItem(opp, item.id)}
+                                          className="mt-0.5 accent-blue-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
+                                        />
+                                        <span className={item.completed ? 'line-through text-sepia-400 dark:text-sepia-500 font-normal' : 'text-sepia-800 dark:text-cream-100 font-medium'}>
+                                          {item.text}
+                                        </span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Interactive Requirements Checklist */}
+                              <div className="p-2.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-150 dark:border-indigo-900/40">
+                                <div className="flex items-center justify-between gap-2 mb-1.5">
+                                  <div className="text-[11px] font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+                                    <ListChecks className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                                    <span>Application Requirements Checklist</span>
+                                  </div>
+                                  <span className="text-[10px] font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-1.5 py-0.5 rounded">
+                                    {requirementsItems.filter((i) => i.completed).length}/{requirementsItems.length} Ready
+                                  </span>
+                                </div>
+                                {requirementsItems.length === 0 ? (
+                                  <p className="text-[10px] text-sepia-400 italic">No requirements logged yet.</p>
+                                ) : (
+                                  <div className="space-y-1">
+                                    {requirementsItems.map((item) => (
+                                      <label
+                                        key={item.id}
+                                        className="flex items-start gap-2 p-1 rounded hover:bg-white/60 dark:hover:bg-sepia-900/40 transition-colors cursor-pointer text-xs"
+                                      >
+                                        <input
+                                          type="checkbox"
+                                          checked={item.completed}
+                                          onChange={() => handleToggleRequirementItem(opp, item.id)}
+                                          className="mt-0.5 accent-indigo-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
+                                        />
+                                        <span className={item.completed ? 'line-through text-sepia-400 dark:text-sepia-500 font-normal' : 'text-sepia-800 dark:text-cream-100 font-medium'}>
+                                          {item.text}
+                                        </span>
+                                      </label>
+                                    ))}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })()}
+
                         {opp.description && (
-                          <div className="mt-1.5 text-[10px] text-sepia-650 dark:text-sepia-400 bg-cream-50/50 dark:bg-sepia-850/40 p-1.5 rounded border border-cream-100 dark:border-sepia-800/80 font-sans max-w-[240px] max-h-[85px] overflow-y-auto">
-                            <span className="font-bold block mb-0.5 text-sepia-550 dark:text-sepia-300">Details:</span>
-                            <FormattedText text={opp.description} />
-                          </div>
-                        )}
-                        {opp.linkedVisionId && (
-                          <div className="mt-1 text-[10px] text-readflow-green dark:text-readflow-lightgreen font-bold flex items-center gap-1 font-sans">
-                            <TrendingUp className="w-3 h-3 text-readflow-green/80" />
-                            <span className="truncate max-w-[200px]" title={visions.find(v => v.id === opp.linkedVisionId)?.title || 'Linked Goal'}>
-                              Goal: {visions.find(v => v.id === opp.linkedVisionId)?.title || 'Linked Goal'}
+                          <div className="mt-2.5 text-xs text-sepia-700 dark:text-sepia-300 bg-cream-50/70 dark:bg-sepia-850/60 p-2.5 rounded-xl border border-cream-200/70 dark:border-sepia-800 font-sans leading-relaxed">
+                            <span className="font-bold block mb-1 text-[10px] uppercase font-mono tracking-wider text-sepia-450 dark:text-sepia-400">
+                              {opp.category === 'Scholarships' ? 'Additional Notes & Essay Prompts:' : opp.category === 'Farming' ? 'Field & Crop Notes:' : opp.category === 'Health' ? 'Workout & Health Log:' : opp.category === 'Learning' ? 'Key Takeaways & Reflections:' : 'Details & Scope:'}
                             </span>
+                            <FormattedText text={opp.description} />
                           </div>
                         )}
                       </td>
 
                       {/* Category Badge */}
-                      <td className="p-4">
+                      <td className="p-4 align-top">
                         <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${meta.bg} ${meta.border} ${meta.color}`}>
                           <Icon className="w-3 h-3" />
                           {opp.category}
@@ -748,14 +963,14 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                       </td>
 
                       {/* Points score */}
-                      <td className="p-4">
+                      <td className="p-4 align-top">
                         <div className="font-mono font-extrabold text-readflow-green dark:text-readflow-lightgreen text-sm">
                           +{opp.points}
                         </div>
                       </td>
 
                       {/* Custom Interactive Stage dropdown */}
-                      <td className="p-4">
+                      <td className="p-4 align-top">
                         <select
                           id={`quick-stage-select-${opp.id}`}
                           value={oppStage}
@@ -777,20 +992,15 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                       </td>
 
                       {/* Direct Editable Qualitative Feedback Column */}
-                      <td className="p-4">
+                      <td className="p-4 align-top">
                         <div className="relative group/feedback">
                           <textarea
                             id={`quick-feedback-input-${opp.id}`}
                             defaultValue={opp.feedback || ''}
                             placeholder="Click to add feedback/notes..."
                             onBlur={(e) => handleQuickFeedbackSave(opp, e.target.value)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' && !e.shiftKey) {
-                                e.currentTarget.blur();
-                              }
-                            }}
-                            rows={1}
-                            className="w-full bg-transparent hover:bg-cream-50/50 focus:bg-white dark:hover:bg-sepia-800/10 dark:focus:bg-sepia-900 border border-transparent hover:border-cream-150 focus:border-readflow-green/40 rounded px-2 py-1 text-xs text-sepia-750 dark:text-cream-200 transition-all font-sans resize-y focus:outline-none"
+                            rows={opp.feedback && opp.feedback.length > 50 ? 3 : 2}
+                            className="w-full bg-cream-50/40 hover:bg-white focus:bg-white dark:bg-sepia-850/30 dark:hover:bg-sepia-900 dark:focus:bg-sepia-900 border border-cream-200 dark:border-sepia-800 focus:border-readflow-green/60 rounded-xl p-2 text-xs text-sepia-800 dark:text-cream-100 transition-all font-sans resize-y focus:outline-none"
                           />
                         </div>
                       </td>

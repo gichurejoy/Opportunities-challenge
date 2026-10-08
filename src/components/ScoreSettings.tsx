@@ -253,7 +253,7 @@ export const ScoreSettings: React.FC<ScoreSettingsProps> = ({
             </span>
           </div>
           {/* Prevent deleting seeded standard categories */}
-          {!['Career', 'Business', 'Learning', 'Health', 'Finance', 'Personal', 'Side Projects', 'Farming'].includes(selectedCategory) && (
+          {!['Career', 'Side Work', 'Scholarships', 'Business', 'Learning', 'Health', 'Finance', 'Personal', 'Side Projects', 'Farming'].includes(selectedCategory) && (
             <button
               type="button"
               onClick={() => handleDeleteCategory(selectedCategory)}

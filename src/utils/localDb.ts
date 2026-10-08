@@ -50,6 +50,14 @@ export const DEFAULT_SCORE_CONFIG: ScoreConfig = {
     'CV Update': 3,
     'Portfolio Update': 5,
   },
+  Scholarships: {
+    'Scholarship Application': 5,
+    'Essay Submitted': 5,
+    'Recommendation Letter Requested': 3,
+    'Interview / Assessment': 10,
+    'Grant Application': 8,
+    'Scholarship Awarded': 20,
+  },
   Business: {
     'Cold Email': 4,
     'Proposal Sent': 8,
@@ -92,6 +100,14 @@ export const DEFAULT_SCORE_CONFIG: ScoreConfig = {
     'Write Documentation': 3,
     'User Interview': 5,
     'Publish Blog': 4,
+  },
+  'Side Work': {
+    'Client Gig Completed': 8,
+    'Freelance Proposal': 5,
+    'Consulting Call': 6,
+    'Contract Milestone': 10,
+    'Invoice Sent': 4,
+    'Paid Gig Acquired': 12,
   },
   Farming: {
     'Farm Visit': 5,
@@ -145,6 +161,12 @@ export const localDb = {
         }
         if (!parsed.nudgeConfig) {
           parsed.nudgeConfig = DEFAULT_NUDGE_CONFIG;
+        }
+        if (parsed.scoreConfig && !parsed.scoreConfig.Scholarships) {
+          parsed.scoreConfig.Scholarships = DEFAULT_SCORE_CONFIG.Scholarships;
+        }
+        if (parsed.scoreConfig && !parsed.scoreConfig['Side Work']) {
+          parsed.scoreConfig['Side Work'] = DEFAULT_SCORE_CONFIG['Side Work'];
         }
         // Purge legacy hardcoded seed data from browser localStorage
         if (Array.isArray(parsed.opportunities)) {

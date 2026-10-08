@@ -50,7 +50,15 @@ export const ChecklistGrid: React.FC<ChecklistGridProps> = ({
   const [newHabitPoints, setNewHabitPoints] = useState(3);
   const [linkToVisionId, setLinkToVisionId] = useState('');
 
-  // Generate date list from today backwards
+  // Helper: get a local-timezone date string (YYYY-MM-DD) for a given Date object
+  const toLocalDateStr = (d: Date): string => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
+  // Generate date list from today backwards (using LOCAL date to avoid UTC timezone shifts)
   const dates = useMemo(() => {
     const list: { dateStr: string; label: string; subLabel: string; isToday: boolean }[] = [];
     const today = new Date();
@@ -58,7 +66,7 @@ export const ChecklistGrid: React.FC<ChecklistGridProps> = ({
     for (let i = resolutionDays - 1; i >= 0; i--) {
       const d = new Date();
       d.setDate(today.getDate() - i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = toLocalDateStr(d); // Use local date, not UTC
       const isToday = i === 0;
       
       const dayName = d.toLocaleDateString('en-US', { weekday: 'short' });
@@ -75,14 +83,22 @@ export const ChecklistGrid: React.FC<ChecklistGridProps> = ({
     return list;
   }, [resolutionDays]);
 
+  // Helper to extract local date string from an ISO timestamp
+  const getLocalDateFromTimestamp = (timestamp: string): string => {
+    const d = new Date(timestamp);
+    return toLocalDateStr(d);
+  };
+
   // Helper to check if a specific habit was logged on a specific date
   const getLogForHabitAndDate = (habit: ChecklistHabit, dateStr: string): Opportunity | undefined => {
     return opportunities.find((opp) => {
-      const oppDateStr = opp.timestamp.split('T')[0];
+      // Compare using local date to avoid UTC timezone mismatches
+      const oppDateStr = getLocalDateFromTimestamp(opp.timestamp);
       return (
         oppDateStr === dateStr &&
         opp.title.toLowerCase() === habit.title.toLowerCase() &&
-        opp.category === habit.category
+        opp.category === habit.category &&
+        opp.isChecklist === true
       );
     });
   };
@@ -99,9 +115,9 @@ export const ChecklistGrid: React.FC<ChecklistGridProps> = ({
         v.supportingCategories.includes(habit.category)
       );
 
-      // Log opportunity with custom timestamp for that specific day
-      // Use middle of the day (12:00) to avoid timezone shifts near boundaries
-      const customTimestamp = `${dateStr}T12:00:00.000Z`;
+      // Build a noon local-time ISO string so the date always maps back
+      // to the correct local calendar day, regardless of the user's timezone.
+      const customTimestamp = `${dateStr}T12:00:00`;
       onLogOpportunity({
         title: habit.title,
         category: habit.category,
@@ -109,6 +125,7 @@ export const ChecklistGrid: React.FC<ChecklistGridProps> = ({
         points: habit.points,
         linkedVisionId: autoVision ? autoVision.id : undefined,
         timestamp: customTimestamp,
+        isChecklist: true,
       });
     }
   };

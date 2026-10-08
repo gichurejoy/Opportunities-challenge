@@ -4,7 +4,7 @@
  */
 
 import React, { useState } from 'react';
-import { Sparkles, Briefcase, Rocket, BookOpen, Heart, Sprout, Plus, Check } from 'lucide-react';
+import { Sparkles, Briefcase, Rocket, BookOpen, Heart, Sprout, Plus, Check, GraduationCap, Laptop } from 'lucide-react';
 
 interface QuickTemplatesProps {
   onLogOpportunity: (title: string, category: string, type: string, points: number) => void;
@@ -34,6 +34,26 @@ const PERSONA_GROUPS: PersonaGroup[] = [
       { id: 't1', title: 'Applied to a high-priority role', category: 'Career', type: 'Job Application', points: 5 },
       { id: 't2', title: 'Sent personalized message to recruiter', category: 'Career', type: 'Recruiter Message', points: 3 },
       { id: 't3', title: 'Updated CV & LinkedIn profile skills', category: 'Career', type: 'CV Update', points: 3 },
+    ]
+  },
+  {
+    id: 'side-work',
+    name: 'Freelance & Side Work',
+    icon: Laptop,
+    items: [
+      { id: 't-sw-1', title: 'Delivered client milestone / project deliverables', category: 'Side Work', type: 'Client Gig Completed', points: 10 },
+      { id: 't-sw-2', title: 'Submitted freelance proposal / gig pitch', category: 'Side Work', type: 'Freelance Proposal', points: 5 },
+      { id: 't-sw-3', title: 'Client discovery or consulting call', category: 'Side Work', type: 'Consulting Call', points: 4 },
+    ]
+  },
+  {
+    id: 'scholarships',
+    name: 'Scholarship Hunter',
+    icon: GraduationCap,
+    items: [
+      { id: 't-sch-1', title: 'Submitted scholarship application & essay', category: 'Scholarships', type: 'Scholarship Application', points: 5 },
+      { id: 't-sch-2', title: 'Requested academic recommendation letter', category: 'Scholarships', type: 'Recommendation Letter Requested', points: 3 },
+      { id: 't-sch-3', title: 'Polished statement of purpose / personal essay', category: 'Scholarships', type: 'Essay Submitted', points: 5 },
     ]
   },
   {

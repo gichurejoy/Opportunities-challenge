@@ -17,10 +17,16 @@ import {
   Trash2, 
   Sparkles,
   CheckCircle2,
-  FileText
+  FileText,
+  GraduationCap,
+  Laptop,
+  CheckSquare,
+  ListChecks,
+  Calendar
 } from 'lucide-react';
-import { Opportunity, ScoreConfig, Vision, ChecklistHabit } from '../types';
+import { Opportunity, ScoreConfig, Vision, ChecklistHabit, textToChecklistItems } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
+import { getCategoryFieldConfig } from '../utils/categoryFields';
 
 interface QuickLoggerProps {
   scoreConfig: ScoreConfig;
@@ -43,12 +49,14 @@ export const CATEGORY_METADATA: {
   };
 } = {
   Career: { icon: Briefcase, color: '#1b3d22', bg: 'bg-[#f0f4f0] dark:bg-[#1a2b1d]', border: 'border-[#dfebd5] dark:border-[#2d4231]', text: 'text-readflow-green dark:text-cream-200' },
+  Scholarships: { icon: GraduationCap, color: '#2b5282', bg: 'bg-[#f0f5fa] dark:bg-[#192433]', border: 'border-[#d6e4f2] dark:border-[#27394f]', text: 'text-blue-900 dark:text-cream-200' },
   Business: { icon: Building, color: '#c29543', bg: 'bg-[#fcf7ec] dark:bg-[#2b2518]', border: 'border-[#f2e6cb] dark:border-[#423925]', text: 'text-amber-800 dark:text-cream-200' },
   Learning: { icon: BookOpen, color: '#3f5d45', bg: 'bg-[#f4f7f4] dark:bg-[#1c261f]', border: 'border-[#e4ebe4] dark:border-[#2a382d]', text: 'text-readflow-olive dark:text-cream-200' },
   Finance: { icon: Coins, color: '#967433', bg: 'bg-[#f9f5ed] dark:bg-[#262118]', border: 'border-[#eeddbb] dark:border-[#383124]', text: 'text-amber-900 dark:text-cream-200' },
   Health: { icon: Activity, color: '#a64d4d', bg: 'bg-[#fcf2f2] dark:bg-[#2b1c1c]', border: 'border-[#f4dddd] dark:border-[#422a2a]', text: 'text-red-800 dark:text-cream-200' },
   Personal: { icon: Heart, color: '#9e527f', bg: 'bg-[#faf0f5] dark:bg-[#2b1b24]', border: 'border-[#f3dde8] dark:border-[#422837]', text: 'text-pink-800 dark:text-cream-200' },
   'Side Projects': { icon: Rocket, color: '#3d617a', bg: 'bg-[#f0f4f7] dark:bg-[#1b252b]', border: 'border-[#dfebf2] dark:border-[#283842]', text: 'text-slate-800 dark:text-cream-200' },
+  'Side Work': { icon: Laptop, color: '#0d9488', bg: 'bg-[#f0fdfa] dark:bg-[#132d29]', border: 'border-[#ccfbf1] dark:border-[#1d463f]', text: 'text-teal-800 dark:text-cream-200' },
   Farming: { icon: Sprout, color: '#567d26', bg: 'bg-[#f4f7ef] dark:bg-[#1f2b15]', border: 'border-[#e5edd8] dark:border-[#304221]', text: 'text-lime-900 dark:text-cream-200' },
 };
 
@@ -72,6 +80,11 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
   const [activeTab, setActiveTab] = useState<'simple' | 'preset' | 'custom' | 'checklist'>('simple');
   const [selectedVisionId, setSelectedVisionId] = useState<string>('');
 
+  // Scholarship specific fields (Eligibility & Requirements become checklists when logged)
+  const [scholarshipEligibility, setScholarshipEligibility] = useState<string>('');
+  const [scholarshipRequirements, setScholarshipRequirements] = useState<string>('');
+  const [scholarshipDeadline, setScholarshipDeadline] = useState<string>('');
+
   // States for custom checklist habit
   const [newHabitTitle, setNewHabitTitle] = useState('');
   const [newHabitCategory, setNewHabitCategory] = useState('Career');
@@ -85,6 +98,9 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
     const currentCategoryPresets = scoreConfig[selectedCategory] || {};
     const firstPresetPoints = Object.values(currentCategoryPresets)[0] as number || 3;
 
+    const eligibilityChecklist = selectedCategory === 'Scholarships' ? textToChecklistItems(scholarshipEligibility) : undefined;
+    const requirementsChecklist = selectedCategory === 'Scholarships' ? textToChecklistItems(scholarshipRequirements) : undefined;
+
     onLogOpportunity({
       title: simpleTitle.trim(),
       category: selectedCategory,
@@ -94,6 +110,11 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
       expectedValue: expectedValue.trim() || undefined,
       linkedVisionId: selectedVisionId || undefined,
       description: description.trim() || undefined,
+      eligibility: selectedCategory === 'Scholarships' ? scholarshipEligibility.trim() || undefined : undefined,
+      requirements: selectedCategory === 'Scholarships' ? scholarshipRequirements.trim() || undefined : undefined,
+      deadline: selectedCategory === 'Scholarships' ? scholarshipDeadline.trim() || undefined : undefined,
+      eligibilityChecklist: eligibilityChecklist && eligibilityChecklist.length > 0 ? eligibilityChecklist : undefined,
+      requirementsChecklist: requirementsChecklist && requirementsChecklist.length > 0 ? requirementsChecklist : undefined,
     });
 
     setSimpleTitle('');
@@ -101,9 +122,15 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
     setExpectedValue('');
     setSelectedVisionId('');
     setDescription('');
+    setScholarshipEligibility('');
+    setScholarshipRequirements('');
+    setScholarshipDeadline('');
   };
 
   const handleLogPreset = (type: string, points: number) => {
+    const eligibilityChecklist = selectedCategory === 'Scholarships' ? textToChecklistItems(scholarshipEligibility) : undefined;
+    const requirementsChecklist = selectedCategory === 'Scholarships' ? textToChecklistItems(scholarshipRequirements) : undefined;
+
     onLogOpportunity({
       title: type,
       category: selectedCategory,
@@ -113,16 +140,27 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
       expectedValue: expectedValue.trim() || undefined,
       linkedVisionId: selectedVisionId || undefined,
       description: description.trim() || undefined,
+      eligibility: selectedCategory === 'Scholarships' ? scholarshipEligibility.trim() || undefined : undefined,
+      requirements: selectedCategory === 'Scholarships' ? scholarshipRequirements.trim() || undefined : undefined,
+      deadline: selectedCategory === 'Scholarships' ? scholarshipDeadline.trim() || undefined : undefined,
+      eligibilityChecklist: eligibilityChecklist && eligibilityChecklist.length > 0 ? eligibilityChecklist : undefined,
+      requirementsChecklist: requirementsChecklist && requirementsChecklist.length > 0 ? requirementsChecklist : undefined,
     });
     setCompanyOrClient('');
     setExpectedValue('');
     setSelectedVisionId('');
     setDescription('');
+    setScholarshipEligibility('');
+    setScholarshipRequirements('');
+    setScholarshipDeadline('');
   };
 
   const handleLogCustom = (e: React.FormEvent) => {
     e.preventDefault();
     if (!customTitle.trim()) return;
+
+    const eligibilityChecklist = selectedCategory === 'Scholarships' ? textToChecklistItems(scholarshipEligibility) : undefined;
+    const requirementsChecklist = selectedCategory === 'Scholarships' ? textToChecklistItems(scholarshipRequirements) : undefined;
 
     onLogOpportunity({
       title: customTitle.trim(),
@@ -133,6 +171,11 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
       expectedValue: expectedValue.trim() || undefined,
       linkedVisionId: selectedVisionId || undefined,
       description: description.trim() || undefined,
+      eligibility: selectedCategory === 'Scholarships' ? scholarshipEligibility.trim() || undefined : undefined,
+      requirements: selectedCategory === 'Scholarships' ? scholarshipRequirements.trim() || undefined : undefined,
+      deadline: selectedCategory === 'Scholarships' ? scholarshipDeadline.trim() || undefined : undefined,
+      eligibilityChecklist: eligibilityChecklist && eligibilityChecklist.length > 0 ? eligibilityChecklist : undefined,
+      requirementsChecklist: requirementsChecklist && requirementsChecklist.length > 0 ? requirementsChecklist : undefined,
     });
 
     setCustomTitle('');
@@ -141,27 +184,47 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
     setExpectedValue('');
     setSelectedVisionId('');
     setDescription('');
+    setScholarshipEligibility('');
+    setScholarshipRequirements('');
+    setScholarshipDeadline('');
   };
 
   const handleToggleChecklistHabit = (habit: ChecklistHabit) => {
-    const isCompletedToday = todayOpportunities.some(
-      (o) => o.title.toLowerCase() === habit.title.toLowerCase() && o.category === habit.category
-    );
+    // Get today's local date string to match against stored timestamps
+    const todayLocal = (() => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${day}`;
+    })();
 
-    if (isCompletedToday) {
-      // Find today's logged opportunity and delete it
-      const found = todayOpportunities.find(
-        (o) => o.title.toLowerCase() === habit.title.toLowerCase() && o.category === habit.category
+    // Find if this habit was already logged today (match by local date + title + category + isChecklist)
+    const found = todayOpportunities.find((o) => {
+      const oppDate = (() => {
+        const d = new Date(o.timestamp);
+        const y = d.getFullYear();
+        const mo = String(d.getMonth() + 1).padStart(2, '0');
+        const dy = String(d.getDate()).padStart(2, '0');
+        return `${y}-${mo}-${dy}`;
+      })();
+      return (
+        oppDate === todayLocal &&
+        o.title.toLowerCase() === habit.title.toLowerCase() &&
+        o.category === habit.category &&
+        o.isChecklist === true
       );
-      if (found) {
-        onDeleteOpportunity(found.id);
-      }
+    });
+
+    if (found) {
+      onDeleteOpportunity(found.id);
     } else {
       onLogOpportunity({
         title: habit.title,
         category: habit.category,
         type: habit.type || 'Daily Habit',
         points: habit.points,
+        isChecklist: true,
       });
     }
   };
@@ -181,6 +244,105 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
   const currentCategoryPresets = scoreConfig[selectedCategory] || {};
   const currentMeta = CATEGORY_METADATA[selectedCategory] || CATEGORY_METADATA.Career;
   const CategoryIcon = currentMeta.icon;
+  const fieldConfig = getCategoryFieldConfig(selectedCategory);
+
+  const renderDetailsFields = (prefix: string) => {
+    if (selectedCategory === 'Scholarships') {
+      return (
+        <div className="space-y-3 p-3 rounded-xl bg-blue-50/40 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/40">
+          <div className="flex items-center gap-1.5 text-xs font-serif font-bold text-blue-900 dark:text-blue-300 mb-1">
+            <GraduationCap className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+            Scholarship Criteria & Requirements
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-sepia-600 dark:text-sepia-300 mb-1 font-sans flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <CheckSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                Eligibility Criteria
+              </span>
+              <span className="text-[10px] font-mono font-medium text-blue-600 dark:text-blue-400 bg-blue-100/60 dark:bg-blue-900/40 px-1.5 py-0.5 rounded">
+                Checklist Item
+              </span>
+            </label>
+            <textarea
+              id={`${prefix}-scholarship-eligibility`}
+              rows={2}
+              value={scholarshipEligibility}
+              onChange={(e) => setScholarshipEligibility(e.target.value)}
+              placeholder={'e.g.\nMin 3.5 GPA / First Class Honours\nUnder 30 years old\nResident of eligible country\n(Enter one per line - each becomes a checkable item!)'}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-sepia-600 dark:text-sepia-300 mb-1 font-sans flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <ListChecks className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                Application Requirements
+              </span>
+              <span className="text-[10px] font-mono font-medium text-blue-600 dark:text-blue-400 bg-blue-100/60 dark:bg-blue-900/40 px-1.5 py-0.5 rounded">
+                Checklist Item
+              </span>
+            </label>
+            <textarea
+              id={`${prefix}-scholarship-requirements`}
+              rows={2}
+              value={scholarshipRequirements}
+              onChange={(e) => setScholarshipRequirements(e.target.value)}
+              placeholder={'e.g.\nOfficial University Transcripts\nStatement of Purpose (SOP)\n2 Academic recommendation letters\nIELTS 7.0+ score report\n(Enter one per line - each becomes a checkable item!)'}
+              className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-sepia-600 dark:text-sepia-300 mb-1 font-sans flex items-center gap-1.5">
+              <Calendar className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+              Application Deadline
+            </label>
+            <input
+              id={`${prefix}-scholarship-deadline`}
+              type="text"
+              value={scholarshipDeadline}
+              onChange={(e) => setScholarshipDeadline(e.target.value)}
+              placeholder="e.g. Nov 15, 2026 or 2026-11-15 (5:00 PM GMT)"
+              className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-sepia-600 dark:text-sepia-300 mb-1 font-sans">
+              Additional Notes & Essay Prompts (Optional)
+            </label>
+            <textarea
+              id={`${prefix}-scholarship-notes`}
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="e.g. Essay question: Why do you want to study in UK? Link to portal, referees..."
+              className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green resize-y font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div>
+        <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
+          {fieldConfig.detailsLabel}
+        </label>
+        <textarea
+          id={`${prefix}-desc-input`}
+          rows={2}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          placeholder={fieldConfig.detailsPlaceholder}
+          className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen resize-y font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
+        />
+      </div>
+    );
+  };
 
   return (
     <div id="quick-logger-panel" className="bg-white dark:bg-sepia-900 rounded-2xl border border-cream-200 dark:border-sepia-800 p-6 shadow-sm flex flex-col h-full transition-all duration-300">
@@ -194,8 +356,8 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
         </span>
       </div>
 
-      {/* Category selector chips */}
-      <div className="grid grid-cols-4 gap-2 mb-4">
+      {/* Category selector chips (responsive 10-category grid) */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 mb-4">
         {Object.keys(CATEGORY_METADATA).map((cat) => {
           const meta = CATEGORY_METADATA[cat];
           const Icon = meta.icon;
@@ -277,7 +439,7 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
           <form id="simple-opportunity-form" onSubmit={handleLogSimple} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1.5 font-sans">
-                What did you do? (We'll auto-assign category weights)
+                {fieldConfig.actionLabel}
               </label>
               <textarea
                 id="simple-title-input"
@@ -285,7 +447,7 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
                 rows={2}
                 value={simpleTitle}
                 onChange={(e) => setSimpleTitle(e.target.value)}
-                placeholder={`e.g., Messaged senior recruiter about the ${selectedCategory} opening, or read 10 pages...`}
+                placeholder={fieldConfig.actionPlaceholder}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen resize-none font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
               />
             </div>
@@ -293,45 +455,33 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
-                  Target Company / Client (Optional)
+                  {fieldConfig.entityLabel}
                 </label>
                 <input
                   id="simple-company-input"
                   type="text"
                   value={companyOrClient}
                   onChange={(e) => setCompanyOrClient(e.target.value)}
-                  placeholder="e.g. Acme Corp, Microsoft, Stanford"
+                  placeholder={fieldConfig.entityPlaceholder}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
-                  Expected Salary / Grant / Amount (Optional)
+                  {fieldConfig.valueLabel}
                 </label>
                 <input
                   id="simple-expected-value-input"
                   type="text"
                   value={expectedValue}
                   onChange={(e) => setExpectedValue(e.target.value)}
-                  placeholder="e.g. $120k / yr, $15,000 grant, KSh 50k"
+                  placeholder={fieldConfig.valuePlaceholder}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
-                Job Description / Enquiry Details (Optional)
-              </label>
-              <textarea
-                id="simple-desc-input"
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g. paste job description, requirements, or enquiry copy..."
-                className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen resize-y font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
-              />
-            </div>
+            {renderDetailsFields('simple')}
 
             <div>
               <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
@@ -381,44 +531,34 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
               <div>
                 <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
-                  Target Company / Client (Optional)
+                  {fieldConfig.entityLabel}
                 </label>
                 <input
                   id="preset-company-input"
                   type="text"
                   value={companyOrClient}
                   onChange={(e) => setCompanyOrClient(e.target.value)}
-                  placeholder="e.g. Acme Corp, Microsoft, Stanford"
+                  placeholder={fieldConfig.entityPlaceholder}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
-                  Expected Salary / Grant / Amount (Optional)
+                  {fieldConfig.valueLabel}
                 </label>
                 <input
                   id="preset-expected-value-input"
                   type="text"
                   value={expectedValue}
                   onChange={(e) => setExpectedValue(e.target.value)}
-                  placeholder="e.g. $120k / yr, $15k grant"
+                  placeholder={fieldConfig.valuePlaceholder}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
                 />
               </div>
             </div>
 
             <div className="mb-3">
-              <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
-                Job Description / Enquiry Details (Optional)
-              </label>
-              <textarea
-                id="preset-desc-input"
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g. paste job description, requirements, or enquiry copy..."
-                className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen resize-y font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
-              />
+              {renderDetailsFields('preset')}
             </div>
 
             <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
@@ -453,7 +593,7 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
           <form id="custom-opportunity-form" onSubmit={handleLogCustom} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1.5">
-                Opportunity Title / Initiative
+                Action / Milestone Title ({selectedCategory})
               </label>
               <input
                 id="custom-title-input"
@@ -461,7 +601,7 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
                 required
                 value={customTitle}
                 onChange={(e) => setCustomTitle(e.target.value)}
-                placeholder="e.g. Completed specialized business proposal deck"
+                placeholder={fieldConfig.actionPlaceholder}
                 className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-900 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen font-sans"
               />
             </div>
@@ -469,45 +609,33 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
-                  Target Company / Client (Optional)
+                  {fieldConfig.entityLabel}
                 </label>
                 <input
                   id="custom-company-input"
                   type="text"
                   value={companyOrClient}
                   onChange={(e) => setCompanyOrClient(e.target.value)}
-                  placeholder="e.g. Acme Corp, Microsoft, Stanford"
+                  placeholder={fieldConfig.entityPlaceholder}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
-                  Expected Salary / Grant / Amount (Optional)
+                  {fieldConfig.valueLabel}
                 </label>
                 <input
                   id="custom-expected-value-input"
                   type="text"
                   value={expectedValue}
                   onChange={(e) => setExpectedValue(e.target.value)}
-                  placeholder="e.g. $120k / yr, $15k grant"
+                  placeholder={fieldConfig.valuePlaceholder}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
                 />
               </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1 font-sans">
-                Job Description / Enquiry Details (Optional)
-              </label>
-              <textarea
-                id="custom-desc-input"
-                rows={2}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="e.g. paste job description, requirements, or enquiry copy..."
-                className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen resize-y font-sans placeholder-sepia-300 dark:placeholder-sepia-600"
-              />
-            </div>
+            {renderDetailsFields('custom')}
 
             <div>
               <div className="flex justify-between text-xs font-semibold text-sepia-500 dark:text-sepia-400 mb-1">
@@ -561,9 +689,21 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
           <div className="space-y-3 flex flex-col h-full">
             <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
               {checklistHabits.map((habit) => {
-                const isCompletedToday = todayOpportunities.some(
-                  (o) => o.title.toLowerCase() === habit.title.toLowerCase() && o.category === habit.category
-                );
+                // Check if completed today using local date + isChecklist flag
+                const isCompletedToday = (() => {
+                  const d = new Date();
+                  const todayLocal = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+                  return todayOpportunities.some((o) => {
+                    const od = new Date(o.timestamp);
+                    const oppLocal = `${od.getFullYear()}-${String(od.getMonth() + 1).padStart(2, '0')}-${String(od.getDate()).padStart(2, '0')}`;
+                    return (
+                      oppLocal === todayLocal &&
+                      o.title.toLowerCase() === habit.title.toLowerCase() &&
+                      o.category === habit.category &&
+                      o.isChecklist === true
+                    );
+                  });
+                })();
                 const meta = CATEGORY_METADATA[habit.category] || CATEGORY_METADATA.Career;
                 const Icon = meta.icon;
                 return (
@@ -656,14 +796,14 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
             Today's Feed List
           </h3>
           <div className="flex-1 overflow-y-auto pr-1 space-y-1.5">
-            {todayOpportunities.length === 0 ? (
+            {todayOpportunities.filter(opp => !opp.isChecklist).length === 0 ? (
               <div className="text-center py-6 text-sepia-400 dark:text-sepia-500 text-xs flex flex-col items-center justify-center h-full font-serif italic">
                 <span>0 achievements logged today.</span>
                 <span className="text-[10px] mt-1 font-sans not-italic">The future is created one small action at a time.</span>
               </div>
             ) : (
               <AnimatePresence initial={false}>
-                {todayOpportunities.map((opp) => {
+                {todayOpportunities.filter(opp => !opp.isChecklist).map((opp) => {
                   const meta = CATEGORY_METADATA[opp.category] || CATEGORY_METADATA.Career;
                   const Icon = meta.icon;
                   return (

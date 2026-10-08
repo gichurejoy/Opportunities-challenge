@@ -13,7 +13,7 @@ import {
   Trophy, 
   Archive, 
   CornerDownRight, 
-  Trash2,
+  Trash2, 
   AlertCircle,
   X,
   ChevronDown,
@@ -22,6 +22,7 @@ import {
   Coins
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { getCategoryFieldConfig } from '../utils/categoryFields';
 
 interface PipelineProps {
   pipelines: OpportunityPipeline[];
@@ -48,8 +49,14 @@ const TEMPLATES = [
   {
     name: 'Scholarship / Grant',
     type: 'Scholarship' as const,
-    category: 'Career',
+    category: 'Scholarships',
     stages: ['Submitted', 'Review', 'Interview', 'Accepted'],
+  },
+  {
+    name: 'Side Work / Gig',
+    type: 'Side Work' as const,
+    category: 'Side Work',
+    stages: ['Pitch / Inbound', 'Scope & Quote', 'Contract Signed', 'In Progress', 'Delivered & Paid 🎉'],
   },
 ];
 
@@ -82,6 +89,9 @@ export const Pipeline: React.FC<PipelineProps> = ({
   const [newNotes, setNewNotes] = useState<string>('');
   const [expandedStageIdx, setExpandedStageIdx] = useState<number | null>(null);
   const [newChecklistTexts, setNewChecklistTexts] = useState<{ [key: number]: string }>({});
+
+  const activeCategory = newTemplateIdx >= 0 && TEMPLATES[newTemplateIdx] ? TEMPLATES[newTemplateIdx].category : 'Career';
+  const pipelineFieldConfig = getCategoryFieldConfig(activeCategory);
 
   const selectedPipeline = pipelines.find((p) => p.id === currentSelectedId) || pipelines[0];
 
@@ -262,27 +272,27 @@ export const Pipeline: React.FC<PipelineProps> = ({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-sepia-450 dark:text-sepia-500 mb-1">
-                  Target Company / Client / Institution (Optional)
+                  {pipelineFieldConfig.entityLabel}
                 </label>
                 <input
                   id="new-pipe-company"
                   type="text"
                   value={newCompanyOrClient}
                   onChange={(e) => setNewCompanyOrClient(e.target.value)}
-                  placeholder="e.g. Acme Corp, Microsoft, Stanford"
+                  placeholder={pipelineFieldConfig.entityPlaceholder}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans"
                 />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-sepia-450 dark:text-sepia-500 mb-1">
-                  Expected Salary / Grant / Value (Optional)
+                  {pipelineFieldConfig.valueLabel}
                 </label>
                 <input
                   id="new-pipe-expected-value"
                   type="text"
                   value={newExpectedValue}
                   onChange={(e) => setNewExpectedValue(e.target.value)}
-                  placeholder="e.g. $120k / yr, $25,000 grant"
+                  placeholder={pipelineFieldConfig.valuePlaceholder}
                   className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green font-sans"
                 />
               </div>
@@ -292,7 +302,7 @@ export const Pipeline: React.FC<PipelineProps> = ({
               <label className="block text-xs font-semibold text-sepia-450 dark:text-sepia-500 mb-1.5">
                 Workflow Preset Structure
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                 {TEMPLATES.map((tmpl, idx) => (
                   <button
                     key={tmpl.name}
