@@ -33,6 +33,7 @@ export interface Opportunity {
   deadline?: string;
   eligibilityChecklist?: ScholarshipChecklistItem[];
   requirementsChecklist?: ScholarshipChecklistItem[];
+  tags?: string[];
 }
 
 export function textToChecklistItems(text?: string): ScholarshipChecklistItem[] {

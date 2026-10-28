@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#18382b" />
+      <stop offset="50%" stop-color="#1b3d22" />
+      <stop offset="100%" stop-color="#0e2316" />
+    </linearGradient>
+    <linearGradient id="ring" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#dfd5c0" />
+      <stop offset="100%" stop-color="#c29543" />
+    </linearGradient>
+  </defs>
+  <!-- Background with rounded corners -->
+  <rect width="512" height="512" rx="128" fill="url(#bg)" />
+  <!-- Stylized inner border -->
+  <rect x="24" y="24" width="464" height="464" rx="104" fill="none" stroke="url(#ring)" stroke-width="6" opacity="0.4" />
+  <!-- Central Emblem "O" -->
+  <circle cx="256" cy="256" r="140" fill="none" stroke="url(#ring)" stroke-width="48" stroke-linecap="round" />
+  <circle cx="256" cy="256" r="64" fill="#c29543" opacity="0.9" />
+</svg>

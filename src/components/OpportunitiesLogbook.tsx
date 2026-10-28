@@ -25,7 +25,8 @@ import {
   CheckSquare,
   ListChecks,
   Calendar,
-  GraduationCap
+  GraduationCap,
+  Tag
 } from 'lucide-react';
 import { CATEGORY_METADATA } from './QuickLogger';
 import { getCategoryFieldConfig } from '../utils/categoryFields';
@@ -70,7 +71,8 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('All');
   const [selectedStage, setSelectedStage] = useState<string>('All');
-  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'points-desc' | 'title-asc'>('date-desc');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'points-desc' | 'title-asc' | 'deadline-asc'>('date-desc');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
@@ -90,6 +92,12 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   const [editEligibility, setEditEligibility] = useState('');
   const [editRequirements, setEditRequirements] = useState('');
   const [editDeadline, setEditDeadline] = useState('');
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState<string>('');
+
+  // Inline row tag adding state
+  const [activeAddTagOppId, setActiveAddTagOppId] = useState<string | null>(null);
+  const [inlineTagInput, setInlineTagInput] = useState<string>('');
 
   // Drag and drop / upload refs
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
@@ -99,6 +107,124 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   const logbookOpportunities = React.useMemo(() => {
     return opportunities.filter((opp) => !isChecklistOpportunity(opp, checklistHabits));
   }, [opportunities, checklistHabits]);
+
+  // Tag extraction and counting
+  const availableTags = React.useMemo(() => {
+    const tagSet = new Set<string>(['#remote', '#inbound', '#high-priority', '#grant', '#referral', '#urgent', '#freelance', '#fellowship']);
+    logbookOpportunities.forEach((opp) => {
+      (opp.tags || []).forEach((t) => tagSet.add(t));
+    });
+    return Array.from(tagSet);
+  }, [logbookOpportunities]);
+
+  const tagCounts = React.useMemo(() => {
+    const map: Record<string, number> = {};
+    logbookOpportunities.forEach((opp) => {
+      (opp.tags || []).forEach((t) => {
+        map[t] = (map[t] || 0) + 1;
+      });
+    });
+    return map;
+  }, [logbookOpportunities]);
+
+  const handleToggleFilterTag = (tag: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+    setCurrentPage(1);
+  };
+
+  const handleAddTagToOpp = (opp: Opportunity, tagToAdd: string) => {
+    const clean = tagToAdd.trim().startsWith('#') ? tagToAdd.trim() : `#${tagToAdd.trim()}`;
+    if (!clean || clean === '#') return;
+    const existing = opp.tags || [];
+    if (existing.includes(clean)) return;
+    onUpdateOpportunity({
+      ...opp,
+      tags: [...existing, clean],
+    });
+    setActiveAddTagOppId(null);
+    setInlineTagInput('');
+  };
+
+  const handleRemoveTagFromOpp = (opp: Opportunity, tagToRemove: string) => {
+    const existing = opp.tags || [];
+    onUpdateOpportunity({
+      ...opp,
+      tags: existing.filter((t) => t !== tagToRemove),
+    });
+  };
+
+  // Helper to download an .ics file for calendar clients
+  const downloadICalEvent = (opp: Opportunity, dateStr: string) => {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return;
+    const startStr = date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+    const endStr = new Date(date.getTime() + 60 * 60 * 1000).toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+
+    const icsContent = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//1000 Opportunities Challenge//Logbook//EN',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'BEGIN:VEVENT',
+      `UID:opp-${opp.id}-${Date.now()}@opportunities.challenge`,
+      `DTSTAMP:${startStr}`,
+      `DTSTART:${startStr}`,
+      `DTEND:${endStr}`,
+      `SUMMARY:Deadline: ${opp.title.replace(/[,;]/g, ' ')}`,
+      `DESCRIPTION:${(opp.description || opp.title + ' Application Deadline').replace(/[\r\n]/g, '\\n')}`,
+      opp.companyOrClient ? `LOCATION:${opp.companyOrClient.replace(/[,;]/g, ' ')}` : '',
+      'STATUS:CONFIRMED',
+      'END:VEVENT',
+      'END:VCALENDAR'
+    ].filter(Boolean).join('\r\n');
+
+    const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `${opp.title.toLowerCase().replace(/[^a-z0-9]/g, '-')}-deadline.ics`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Helper to generate Google Calendar template link
+  const getGoogleCalendarUrl = (opp: Opportunity, dateStr: string): string => {
+    const date = new Date(dateStr);
+    if (isNaN(date.getTime())) return '#';
+    const y = date.getFullYear();
+    const m = String(date.getMonth() + 1).padStart(2, '0');
+    const d = String(date.getDate()).padStart(2, '0');
+    const dateParam = `${y}${m}${d}`;
+
+    const text = encodeURIComponent(`Deadline: ${opp.title}`);
+    const details = encodeURIComponent(
+      `1000 Opportunities Challenge - Application Deadline\nTarget: ${opp.companyOrClient || 'N/A'}\nAward / Value: ${opp.expectedValue || 'N/A'}\n\nNotes:\n${opp.description || ''}`
+    );
+    const location = encodeURIComponent(opp.companyOrClient || '');
+
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${dateParam}/${dateParam}&details=${details}&location=${location}`;
+  };
+
+  // Helper for deadline countdown text
+  const getDeadlineCountdown = (dateStr: string): { text: string; urgent: boolean; past: boolean } => {
+    const parsed = new Date(dateStr);
+    if (isNaN(parsed.getTime())) return { text: dateStr, urgent: false, past: false };
+    const today = new Date();
+    const todayMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const targetMidnight = new Date(parsed.getFullYear(), parsed.getMonth(), parsed.getDate());
+    const diffDays = Math.round((targetMidnight.getTime() - todayMidnight.getTime()) / (1000 * 60 * 60 * 24));
+
+    if (diffDays < 0) return { text: `${Math.abs(diffDays)}d overdue`, urgent: false, past: true };
+    if (diffDays === 0) return { text: 'Due today!', urgent: true, past: false };
+    if (diffDays === 1) return { text: 'Due tomorrow', urgent: true, past: false };
+    if (diffDays <= 7) return { text: `${diffDays} days left`, urgent: true, past: false };
+    return { text: `in ${diffDays} days`, urgent: false, past: false };
+  };
 
   // Statistics
   const totalPoints = logbookOpportunities.reduce((sum, o) => sum + o.points, 0);
@@ -111,17 +237,30 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                           (opp.companyOrClient && opp.companyOrClient.toLowerCase().includes(searchQuery.toLowerCase())) ||
                           (opp.expectedValue && opp.expectedValue.toLowerCase().includes(searchQuery.toLowerCase())) ||
                           (opp.type && opp.type.toLowerCase().includes(searchQuery.toLowerCase())) ||
-                          (opp.description && opp.description.toLowerCase().includes(searchQuery.toLowerCase()));
-    
+                          (opp.description && opp.description.toLowerCase().includes(searchQuery.toLowerCase())) ||
+                          (opp.tags && opp.tags.some((t) => t.toLowerCase().includes(searchQuery.toLowerCase())));
+
     const matchesCategory = selectedCategory === 'All' || opp.category === selectedCategory;
-    
+
     const currentOppStage = opp.stage || 'Sourced';
     const matchesStage = selectedStage === 'All' || currentOppStage === selectedStage;
 
-    return matchesSearch && matchesCategory && matchesStage;
+    const matchesTags =
+      selectedTags.length === 0 ||
+      selectedTags.every((st) => (opp.tags || []).includes(st));
+
+    return matchesSearch && matchesCategory && matchesStage && matchesTags;
   });
 
   const sortedOpps = [...filteredOpps].sort((a, b) => {
+    if (sortBy === 'deadline-asc') {
+      if (a.deadline && b.deadline) {
+        return new Date(a.deadline).getTime() - new Date(b.deadline).getTime();
+      }
+      if (a.deadline) return -1;
+      if (b.deadline) return 1;
+      return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
+    }
     if (sortBy === 'date-desc') {
       return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
     }
@@ -211,6 +350,8 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
       (opp.requirementsChecklist ? opp.requirementsChecklist.map((i) => i.text).join('\n') : '')
     );
     setEditDeadline(opp.deadline || '');
+    setEditTags(opp.tags ? [...opp.tags] : []);
+    setNewTagInput('');
   };
 
   // Save Inline Edits
@@ -249,6 +390,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
       deadline: isScholarship ? editDeadline.trim() || undefined : opp.deadline,
       eligibilityChecklist,
       requirementsChecklist,
+      tags: editTags.length > 0 ? editTags : undefined,
     });
     setEditingId(null);
   };
@@ -550,12 +692,74 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
               onChange={(e) => { setSortBy(e.target.value as any); setCurrentPage(1); }}
               className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-cream-50/20 dark:bg-sepia-900 text-sepia-700 dark:text-cream-200 focus:outline-none focus:ring-1 focus:ring-readflow-green cursor-pointer font-medium"
             >
+              <option value="deadline-asc">Approaching Deadline (Closest First)</option>
               <option value="date-desc">Newest Attempt First</option>
               <option value="date-asc">Oldest Attempt First</option>
               <option value="points-desc">Highest Quality points</option>
               <option value="title-asc">Alphabetical (A-Z)</option>
             </select>
           </div>
+        </div>
+
+        {/* Multi-Tagging Filter Pill Bar */}
+        <div className="pt-2.5 border-t border-cream-150 dark:border-sepia-800 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span className="text-[11px] font-mono font-bold text-sepia-400 dark:text-sepia-500 flex items-center gap-1 mr-1">
+              <Tag className="w-3 h-3 text-readflow-gold" />
+              Tags:
+            </span>
+
+            {/* All Tags pill */}
+            <button
+              type="button"
+              id="filter-tag-all"
+              onClick={() => { setSelectedTags([]); setCurrentPage(1); }}
+              className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                selectedTags.length === 0
+                  ? 'bg-readflow-green text-cream-50 shadow-xs'
+                  : 'bg-cream-100 dark:bg-sepia-850 text-sepia-650 dark:text-cream-300 hover:bg-cream-200 dark:hover:bg-sepia-800 border border-cream-200 dark:border-sepia-750'
+              }`}
+            >
+              All Tags ({logbookOpportunities.length})
+            </button>
+
+            {/* Individual Tag Chips */}
+            {availableTags.map((tag) => {
+              const count = tagCounts[tag] || 0;
+              const isSelected = selectedTags.includes(tag);
+              return (
+                <button
+                  type="button"
+                  key={tag}
+                  id={`filter-tag-${tag.replace('#', '')}`}
+                  onClick={() => handleToggleFilterTag(tag)}
+                  className={`px-2.5 py-1 rounded-full text-[10px] font-mono transition-all flex items-center gap-1 cursor-pointer ${
+                    isSelected
+                      ? 'bg-readflow-green text-cream-50 font-bold shadow-xs'
+                      : 'bg-cream-100 dark:bg-sepia-850 text-sepia-650 dark:text-cream-300 hover:bg-cream-200 dark:hover:bg-sepia-800 border border-cream-200 dark:border-sepia-750'
+                  }`}
+                >
+                  <span>{tag}</span>
+                  <span className={`px-1 py-0.2 rounded-full text-[9px] ${
+                    isSelected ? 'bg-black/20 text-cream-50' : 'bg-cream-200/80 dark:bg-sepia-800 text-sepia-500'
+                  }`}>
+                    {count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {selectedTags.length > 0 && (
+            <button
+              type="button"
+              id="clear-tags-filter-btn"
+              onClick={() => { setSelectedTags([]); setCurrentPage(1); }}
+              className="text-[10px] font-mono font-bold text-rose-500 hover:underline cursor-pointer"
+            >
+              Clear Tags Filter ({selectedTags.length})
+            </button>
+          )}
         </div>
       </div>
 
@@ -715,6 +919,60 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                               ))}
                             </select>
                           </div>
+
+                          {/* Edit Mode Tags */}
+                          <div>
+                            <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Tags & Labels</label>
+                            <div className="flex flex-wrap gap-1 mb-1 mt-0.5">
+                              {editTags.map((t) => (
+                                <span
+                                  key={t}
+                                  className="inline-flex items-center gap-1 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded bg-cream-150 dark:bg-sepia-800 text-sepia-800 dark:text-cream-200 border border-cream-200 dark:border-sepia-700"
+                                >
+                                  {t}
+                                  <button
+                                    type="button"
+                                    onClick={() => setEditTags(editTags.filter((x) => x !== t))}
+                                    className="text-sepia-400 hover:text-rose-500 font-bold ml-0.5 cursor-pointer"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <input
+                                type="text"
+                                value={newTagInput}
+                                onChange={(e) => setNewTagInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    const clean = newTagInput.trim().startsWith('#') ? newTagInput.trim() : `#${newTagInput.trim()}`;
+                                    if (clean && clean !== '#' && !editTags.includes(clean)) {
+                                      setEditTags([...editTags, clean]);
+                                    }
+                                    setNewTagInput('');
+                                  }
+                                }}
+                                placeholder="Add tag (e.g. #remote)..."
+                                className="flex-1 px-2 py-1 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 font-mono"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const clean = newTagInput.trim().startsWith('#') ? newTagInput.trim() : `#${newTagInput.trim()}`;
+                                  if (clean && clean !== '#' && !editTags.includes(clean)) {
+                                    setEditTags([...editTags, clean]);
+                                  }
+                                  setNewTagInput('');
+                                }}
+                                className="px-2 py-1 text-xs font-bold rounded bg-cream-200 dark:bg-sepia-800 text-sepia-800 dark:text-cream-200 cursor-pointer"
+                              >
+                                +
+                              </button>
+                            </div>
+                          </div>
                         </td>
 
                         {/* Category selection */}
@@ -849,6 +1107,69 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                           </div>
                         )}
 
+                        {/* Opportunity Tags & Inline Quick-Add */}
+                        <div className="flex flex-wrap items-center gap-1 mt-2">
+                          {(opp.tags || []).map((t) => (
+                            <span
+                              key={t}
+                              className="inline-flex items-center gap-0.5 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-cream-150 dark:bg-sepia-800 text-sepia-750 dark:text-cream-200 border border-cream-200 dark:border-sepia-700"
+                            >
+                              {t}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRemoveTagFromOpp(opp, t);
+                                }}
+                                className="text-sepia-400 hover:text-rose-500 ml-0.5 cursor-pointer font-bold leading-none"
+                                title={`Remove tag ${t}`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+
+                          {activeAddTagOppId === opp.id ? (
+                            <form
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                handleAddTagToOpp(opp, inlineTagInput);
+                              }}
+                              className="inline-flex items-center gap-0.5"
+                            >
+                              <input
+                                type="text"
+                                value={inlineTagInput}
+                                onChange={(e) => setInlineTagInput(e.target.value)}
+                                placeholder="#tag"
+                                autoFocus
+                                onBlur={() => {
+                                  if (!inlineTagInput.trim()) setActiveAddTagOppId(null);
+                                }}
+                                className="w-16 px-1.5 py-0.5 text-[9px] font-mono rounded border border-readflow-green bg-white dark:bg-sepia-900 text-sepia-800 dark:text-cream-100 focus:outline-none"
+                              />
+                              <button
+                                type="submit"
+                                className="px-1 py-0.5 text-[9px] font-bold bg-readflow-green text-cream-50 rounded"
+                              >
+                                ✓
+                              </button>
+                            </form>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setActiveAddTagOppId(opp.id);
+                                setInlineTagInput('');
+                              }}
+                              className="text-[9px] font-mono text-sepia-400 hover:text-readflow-green dark:hover:text-readflow-lightgreen px-1.5 py-0.5 rounded border border-dashed border-cream-250 dark:border-sepia-750 cursor-pointer flex items-center gap-0.5"
+                              title="Add tag to opportunity"
+                            >
+                              <Plus className="w-2.5 h-2.5" /> tag
+                            </button>
+                          )}
+                        </div>
+
                         {/* SCHOLARSHIP SECTION: Eligibility Checklist, Requirements Checklist & Deadline */}
                         {opp.category === 'Scholarships' && (() => {
                           const eligibilityItems = opp.eligibilityChecklist && opp.eligibilityChecklist.length > 0
@@ -864,12 +1185,48 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
 
                           return (
                             <div className="mt-3 space-y-2.5">
-                              {opp.deadline && (
-                                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 border border-amber-200/80 dark:border-amber-800/50">
-                                  <Calendar className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                                  <span>Deadline: <strong className="font-mono">{opp.deadline}</strong></span>
-                                </div>
-                              )}
+                              {opp.deadline && (() => {
+                                const countdown = getDeadlineCountdown(opp.deadline);
+                                const gCalUrl = getGoogleCalendarUrl(opp, opp.deadline);
+                                return (
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${
+                                      countdown.past
+                                        ? 'bg-stone-100 dark:bg-stone-900 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-800'
+                                        : countdown.urgent
+                                        ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700 animate-pulse'
+                                        : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                    }`}>
+                                      <Calendar className="w-3.5 h-3.5 text-readflow-gold shrink-0" />
+                                      <span>Deadline: <strong className="font-mono">{opp.deadline}</strong></span>
+                                      <span className="text-[10px] font-mono font-bold opacity-80">({countdown.text})</span>
+                                    </div>
+
+                                    {/* Google Calendar and iCal buttons */}
+                                    <div className="inline-flex items-center gap-1">
+                                      <a
+                                        href={gCalUrl}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="px-2 py-0.5 rounded bg-cream-100 dark:bg-sepia-800 hover:bg-cream-200 dark:hover:bg-sepia-750 text-sepia-700 dark:text-cream-200 text-[10px] font-mono font-bold inline-flex items-center gap-1 border border-cream-200 dark:border-sepia-700"
+                                        title="Add deadline to Google Calendar"
+                                      >
+                                        <ExternalLink className="w-2.5 h-2.5 text-readflow-gold" />
+                                        Google Cal
+                                      </a>
+                                      <button
+                                        type="button"
+                                        onClick={() => downloadICalEvent(opp, opp.deadline!)}
+                                        className="px-2 py-0.5 rounded bg-cream-100 dark:bg-sepia-800 hover:bg-cream-200 dark:hover:bg-sepia-750 text-sepia-700 dark:text-cream-200 text-[10px] font-mono font-bold inline-flex items-center gap-1 border border-cream-200 dark:border-sepia-700 cursor-pointer"
+                                        title="Download iCal event (.ics)"
+                                      >
+                                        <Download className="w-2.5 h-2.5 text-readflow-green" />
+                                        iCal
+                                      </button>
+                                    </div>
+                                  </div>
+                                );
+                              })()}
 
                               {/* Interactive Eligibility Checklist */}
                               <div className="p-2.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-150 dark:border-blue-900/40">

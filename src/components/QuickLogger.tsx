@@ -22,7 +22,9 @@ import {
   Laptop,
   CheckSquare,
   ListChecks,
-  Calendar
+  Calendar,
+  Tag,
+  X
 } from 'lucide-react';
 import { Opportunity, ScoreConfig, Vision, ChecklistHabit, textToChecklistItems } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -60,6 +62,17 @@ export const CATEGORY_METADATA: {
   Farming: { icon: Sprout, color: '#567d26', bg: 'bg-[#f4f7ef] dark:bg-[#1f2b15]', border: 'border-[#e5edd8] dark:border-[#304221]', text: 'text-lime-900 dark:text-cream-200' },
 };
 
+export const PRESET_TAGS = [
+  '#remote',
+  '#inbound',
+  '#high-priority',
+  '#grant',
+  '#referral',
+  '#urgent',
+  '#freelance',
+  '#fellowship'
+];
+
 export const QuickLogger: React.FC<QuickLoggerProps> = ({
   scoreConfig,
   onLogOpportunity,
@@ -75,6 +88,7 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
   const [companyOrClient, setCompanyOrClient] = useState<string>('');
   const [expectedValue, setExpectedValue] = useState<string>('');
   const [description, setDescription] = useState<string>('');
+
   const [customTitle, setCustomTitle] = useState<string>('');
   const [customPoints, setCustomPoints] = useState<number>(0);
   const [activeTab, setActiveTab] = useState<'simple' | 'preset' | 'custom' | 'checklist'>('simple');
@@ -84,6 +98,28 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
   const [scholarshipEligibility, setScholarshipEligibility] = useState<string>('');
   const [scholarshipRequirements, setScholarshipRequirements] = useState<string>('');
   const [scholarshipDeadline, setScholarshipDeadline] = useState<string>('');
+
+  // Multi-tagging states
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [customTagInput, setCustomTagInput] = useState<string>('');
+
+  const handleToggleTag = (tag: string) => {
+    const clean = tag.trim().startsWith('#') ? tag.trim() : `#${tag.trim()}`;
+    setSelectedTags((prev) =>
+      prev.includes(clean) ? prev.filter((t) => t !== clean) : [...prev, clean]
+    );
+  };
+
+  const handleAddCustomTag = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = customTagInput.trim();
+    if (!trimmed) return;
+    const clean = trimmed.startsWith('#') ? trimmed : `#${trimmed}`;
+    if (!selectedTags.includes(clean)) {
+      setSelectedTags((prev) => [...prev, clean]);
+    }
+    setCustomTagInput('');
+  };
 
   // States for custom checklist habit
   const [newHabitTitle, setNewHabitTitle] = useState('');
@@ -115,6 +151,7 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
       deadline: selectedCategory === 'Scholarships' ? scholarshipDeadline.trim() || undefined : undefined,
       eligibilityChecklist: eligibilityChecklist && eligibilityChecklist.length > 0 ? eligibilityChecklist : undefined,
       requirementsChecklist: requirementsChecklist && requirementsChecklist.length > 0 ? requirementsChecklist : undefined,
+      tags: selectedTags.length > 0 ? selectedTags : undefined,
     });
 
     setSimpleTitle('');
@@ -125,6 +162,8 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
     setScholarshipEligibility('');
     setScholarshipRequirements('');
     setScholarshipDeadline('');
+    setSelectedTags([]);
+    setCustomTagInput('');
   };
 
   const handleLogPreset = (type: string, points: number) => {
@@ -145,6 +184,7 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
       deadline: selectedCategory === 'Scholarships' ? scholarshipDeadline.trim() || undefined : undefined,
       eligibilityChecklist: eligibilityChecklist && eligibilityChecklist.length > 0 ? eligibilityChecklist : undefined,
       requirementsChecklist: requirementsChecklist && requirementsChecklist.length > 0 ? requirementsChecklist : undefined,
+      tags: selectedTags.length > 0 ? selectedTags : undefined,
     });
     setCompanyOrClient('');
     setExpectedValue('');
@@ -153,6 +193,8 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
     setScholarshipEligibility('');
     setScholarshipRequirements('');
     setScholarshipDeadline('');
+    setSelectedTags([]);
+    setCustomTagInput('');
   };
 
   const handleLogCustom = (e: React.FormEvent) => {
@@ -176,6 +218,7 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
       deadline: selectedCategory === 'Scholarships' ? scholarshipDeadline.trim() || undefined : undefined,
       eligibilityChecklist: eligibilityChecklist && eligibilityChecklist.length > 0 ? eligibilityChecklist : undefined,
       requirementsChecklist: requirementsChecklist && requirementsChecklist.length > 0 ? requirementsChecklist : undefined,
+      tags: selectedTags.length > 0 ? selectedTags : undefined,
     });
 
     setCustomTitle('');
@@ -187,6 +230,8 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
     setScholarshipEligibility('');
     setScholarshipRequirements('');
     setScholarshipDeadline('');
+    setSelectedTags([]);
+    setCustomTagInput('');
   };
 
   const handleToggleChecklistHabit = (habit: ChecklistHabit) => {
@@ -344,6 +389,92 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
     );
   };
 
+  const renderTagsSelector = () => (
+    <div className="space-y-1.5 pt-1">
+      <div className="flex items-center justify-between text-xs font-semibold text-sepia-500 dark:text-sepia-400">
+        <span className="flex items-center gap-1 font-sans">
+          <Tag className="w-3.5 h-3.5 text-readflow-gold" />
+          Tags & Categories (Optional)
+        </span>
+        {selectedTags.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setSelectedTags([])}
+            className="text-[10px] text-sepia-400 hover:text-rose-500 font-mono"
+          >
+            Clear ({selectedTags.length})
+          </button>
+        )}
+      </div>
+
+      {/* Selected tags badges */}
+      {selectedTags.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-1">
+          {selectedTags.map((t) => (
+            <span
+              key={t}
+              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-readflow-green/10 dark:bg-readflow-green/20 text-readflow-green dark:text-readflow-lightgreen border border-readflow-green/20"
+            >
+              {t}
+              <button
+                type="button"
+                onClick={() => handleToggleTag(t)}
+                className="hover:text-rose-500 ml-0.5 cursor-pointer font-bold"
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Preset tag pills */}
+      <div className="flex flex-wrap items-center gap-1.5">
+        {PRESET_TAGS.map((tag) => {
+          const isSelected = selectedTags.includes(tag);
+          return (
+            <button
+              type="button"
+              key={tag}
+              onClick={() => handleToggleTag(tag)}
+              className={`px-2 py-0.5 rounded-full text-[10px] font-mono transition-all cursor-pointer ${
+                isSelected
+                  ? 'bg-readflow-green dark:bg-readflow-olive text-cream-50 font-bold shadow-xs'
+                  : 'bg-cream-100 dark:bg-sepia-800 text-sepia-650 dark:text-sepia-300 hover:bg-cream-200 dark:hover:bg-sepia-750 border border-cream-200 dark:border-sepia-700'
+              }`}
+            >
+              {tag}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Custom tag input */}
+      <div className="flex items-center gap-1.5 mt-1.5">
+        <input
+          type="text"
+          value={customTagInput}
+          onChange={(e) => setCustomTagInput(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              handleAddCustomTag();
+            }
+          }}
+          placeholder="Type tag (e.g. #lead) & press Enter"
+          className="flex-1 px-2.5 py-1 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-800 dark:text-cream-100 placeholder-sepia-300 dark:placeholder-sepia-600 focus:outline-none focus:ring-1 focus:ring-readflow-green font-mono"
+        />
+        <button
+          type="button"
+          onClick={() => handleAddCustomTag()}
+          className="px-2.5 py-1 bg-cream-150 hover:bg-cream-200 dark:bg-sepia-800 dark:hover:bg-sepia-750 text-sepia-750 dark:text-cream-200 text-xs font-bold rounded-lg transition-colors cursor-pointer"
+        >
+          + Tag
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div id="quick-logger-panel" className="bg-white dark:bg-sepia-900 rounded-2xl border border-cream-200 dark:border-sepia-800 p-6 shadow-sm flex flex-col h-full transition-all duration-300">
       <div className="flex items-center justify-between mb-4">
@@ -500,6 +631,8 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
               </select>
             </div>
 
+            {renderTagsSelector()}
+
             <button
               id="submit-simple-btn"
               type="submit"
@@ -559,6 +692,10 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
 
             <div className="mb-3">
               {renderDetailsFields('preset')}
+            </div>
+
+            <div className="mb-3">
+              {renderTagsSelector()}
             </div>
 
             <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1">
@@ -674,6 +811,8 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
                 ))}
               </select>
             </div>
+
+            {renderTagsSelector()}
 
             <button
               id="submit-custom-btn"

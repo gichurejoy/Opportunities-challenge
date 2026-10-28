@@ -30,8 +30,10 @@ import { OnboardingTour } from './components/OnboardingTour';
 import { BadgesModal } from './components/BadgesModal';
 import { WeeklyReportModal } from './components/WeeklyReportModal';
 import { QuickTemplates } from './components/QuickTemplates';
+import { DeadlineTracker } from './components/DeadlineTracker';
+import { useNetworkStatus, pwaManager } from './utils/pwa';
 import { User, api, authStorage } from './utils/api';
-import { Sparkles, Trophy, Settings, Archive, Star, CheckCircle, Info, Sun, Moon, LayoutDashboard, ClipboardList, ListChecks, BellRing, Home, LogIn, LogOut, User as UserIcon, Cloud, Database, Printer, Award, HelpCircle } from 'lucide-react';
+import { Sparkles, Trophy, Settings, Archive, Star, CheckCircle, Info, Sun, Moon, LayoutDashboard, ClipboardList, ListChecks, BellRing, Home, LogIn, LogOut, User as UserIcon, Cloud, Database, Printer, Award, HelpCircle, Wifi, WifiOff, RefreshCw, Smartphone } from 'lucide-react';
 
 
 export default function App() {
@@ -83,6 +85,15 @@ export default function App() {
     initAuthAndState();
   }, []);
 
+  // Offline sync handler when connection is restored
+  const handleOfflineSync = async () => {
+    if (authStorage.getToken() && state) {
+      await api.saveStateToDb(state);
+    }
+  };
+
+  const { isOnline, isSyncing, hasPendingSync, canInstall, promptInstall, triggerSync } = useNetworkStatus(handleOfflineSync);
+
   // Sync state to localDb and DB (if authenticated) on updates
   const updateState = (updater: (prev: AppState) => AppState) => {
     setState((prev) => {
@@ -90,7 +101,14 @@ export default function App() {
       const next = updater(prev);
       localDb.saveState(next);
       if (authStorage.getToken()) {
-        api.saveStateToDb(next).catch(err => console.error('Cloud state sync error:', err));
+        if (!navigator.onLine) {
+          pwaManager.markPendingSync(true);
+        } else {
+          api.saveStateToDb(next).catch((err) => {
+            console.error('Cloud state sync error:', err);
+            pwaManager.markPendingSync(true);
+          });
+        }
       }
       return next;
     });
@@ -694,6 +712,18 @@ export default function App() {
 
             {/* Desktop Theme Switcher & User Account */}
             <div className="hidden md:flex items-center gap-2.5">
+              {canInstall && (
+                <button
+                  id="pwa-install-btn"
+                  onClick={promptInstall}
+                  className="px-3 py-2 rounded-xl bg-readflow-green/10 dark:bg-readflow-green/20 border border-readflow-green/20 text-readflow-green dark:text-readflow-lightgreen text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer hover:bg-readflow-green/20"
+                  title="Install 1000 Opportunities Challenge to your device"
+                >
+                  <Smartphone className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+                  <span>Install App</span>
+                </button>
+              )}
+
               <button
                 onClick={() => setIsBadgesOpen(true)}
                 className="px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/60"
@@ -724,9 +754,27 @@ export default function App() {
                   <span className="text-xs font-bold truncate max-w-[100px] text-sepia-900 dark:text-cream-100 leading-tight">
                     {currentUser.name || currentUser.email.split('@')[0]}
                   </span>
-                  <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono font-semibold flex items-center gap-0.5">
-                    <Cloud className="w-2.5 h-2.5" /> Cloud DB
-                  </span>
+                  {!isOnline ? (
+                    <span className="text-[9px] text-amber-600 dark:text-amber-400 font-mono font-bold flex items-center gap-0.5 animate-pulse" title="Offline Mode: Changes saved locally">
+                      <WifiOff className="w-2.5 h-2.5" /> Offline
+                    </span>
+                  ) : isSyncing ? (
+                    <span className="text-[9px] text-blue-600 dark:text-blue-400 font-mono font-bold flex items-center gap-0.5" title="Syncing changes to cloud...">
+                      <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Syncing...
+                    </span>
+                  ) : hasPendingSync ? (
+                    <button
+                      onClick={triggerSync}
+                      className="text-[9px] text-amber-600 dark:text-amber-400 font-mono font-bold flex items-center gap-0.5 underline cursor-pointer hover:text-amber-700"
+                      title="Click to sync offline changes now"
+                    >
+                      <Cloud className="w-2.5 h-2.5" /> Sync Cloud
+                    </button>
+                  ) : (
+                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono font-semibold flex items-center gap-0.5">
+                      <Cloud className="w-2.5 h-2.5" /> Cloud DB
+                    </span>
+                  )}
                 </div>
                 <button
                   onClick={handleSignOut}
@@ -819,6 +867,14 @@ export default function App() {
                 visions={state.visions}
                 recentOpportunities={state.opportunities}
                 onLogOpportunity={handleLogOpportunity}
+              />
+            </section>
+
+            {/* Approaching Deadlines & Countdown Calendar */}
+            <section id="deadlines-section">
+              <DeadlineTracker
+                opportunities={state.opportunities}
+                onNavigateToLogbook={() => setCurrentView('logbook')}
               />
             </section>
 

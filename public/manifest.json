@@ -1,16 +1,20 @@
 {
   "short_name": "1000 Opps",
   "name": "1000 Opportunities Challenge",
+  "description": "Your future is created, not awaited. Track, log, and generate 1,000 career, scholarship, side work, and business opportunities.",
   "icons": [
     {
-      "src": "/favicon.ico",
-      "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "src": "/icon.svg",
+      "sizes": "512x512 192x192 128x128 64x64",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ],
   "start_url": "/",
-  "background_color": "#0d1b15",
+  "scope": "/",
+  "background_color": "#0f0e0d",
   "theme_color": "#18382b",
   "display": "standalone",
-  "orientation": "portrait"
+  "orientation": "portrait",
+  "categories": ["productivity", "education", "business"]
 }
