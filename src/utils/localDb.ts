@@ -176,17 +176,17 @@ export const localDb = {
         }
         if (Array.isArray(parsed.pipelines)) {
           parsed.pipelines = parsed.pipelines.filter(
-            (p: any) => !p.id.startsWith('pipe-')
+            (p: any) => !p.id.startsWith('pipe-seed-')
           );
         }
         if (Array.isArray(parsed.visions)) {
           parsed.visions = parsed.visions.filter(
-            (v: any) => !v.id.startsWith('vision-')
+            (v: any) => !v.id.startsWith('vision-seed-')
           );
         }
         if (Array.isArray(parsed.checklistHabits)) {
           parsed.checklistHabits = parsed.checklistHabits.filter(
-            (h: any) => !h.id.startsWith('hab-')
+            (h: any) => !h.id.startsWith('hab-seed-')
           );
         }
         if (parsed.streakStates && (parsed.streakStates.opportunity?.currentStreak === 6 || parsed.streakStates.reading?.currentStreak === 12)) {

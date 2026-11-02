@@ -12,25 +12,36 @@
   --color-cream-100: #faf6f0;
   --color-cream-150: #f4eee1;
   --color-cream-200: #ebe4d5;
+  --color-cream-250: #e3d9c7;
   --color-cream-300: #dfd5c0;
   --color-cream-400: #cbbba1;
   
   --color-sepia-950: #0f0e0d;
   --color-sepia-900: #161513;
-  --color-sepia-800: #1e1d1b;
-  --color-sepia-750: #262422;
+  --color-sepia-850: #1a1917;
+  --color-sepia-800: #22201d;
+  --color-sepia-750: #2a2825;
   --color-sepia-700: #35322f;
+  --color-sepia-650: #423e3a;
   --color-sepia-600: #494541;
+  --color-sepia-550: #5c5650;
   --color-sepia-500: #6a645e;
+  --color-sepia-450: #7d766e;
   --color-sepia-400: #938c82;
+  --color-sepia-350: #a8a095;
   --color-sepia-300: #bcb5a9;
+  --color-sepia-250: #ccc6ba;
   --color-sepia-200: #dcd7cc;
+  --color-sepia-150: #e4dfd6;
   --color-sepia-100: #eae6df;
   --color-sepia-50: #f3f0ea;
 
   --color-readflow-green: #1b3d22;
+  --color-readflow-lightgreen: #4ade80;
   --color-readflow-olive: #3f5d45;
+  --color-readflow-lightolive: #86efac;
   --color-readflow-gold: #c29543;
+  --color-readflow-lightgold: #fde047;
 }
 
 .bg-noise {

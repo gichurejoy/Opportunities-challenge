@@ -307,7 +307,7 @@ export const Vault: React.FC<VaultProps> = ({
 
         {/* Results table list */}
         <div className="border border-cream-200 dark:border-sepia-800 rounded-xl overflow-hidden">
-          <div className="max-h-[300px] overflow-y-auto">
+          <div className="max-h-[500px] overflow-y-auto">
             <table id="vault-table" className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-cream-50 dark:bg-sepia-800/40 text-sepia-500 dark:text-sepia-400 font-bold border-b border-cream-200 dark:border-sepia-850">
@@ -542,221 +542,245 @@ export const Vault: React.FC<VaultProps> = ({
                       );
                     }
 
+                    const vaultEligibilityItems = opp.category === 'Scholarships'
+                      ? (opp.eligibilityChecklist && opp.eligibilityChecklist.length > 0
+                          ? opp.eligibilityChecklist
+                          : opp.eligibility
+                          ? textToChecklistItems(opp.eligibility)
+                          : [])
+                      : [];
+
+                    const vaultRequirementsItems = opp.category === 'Scholarships'
+                      ? (opp.requirementsChecklist && opp.requirementsChecklist.length > 0
+                          ? opp.requirementsChecklist
+                          : opp.requirements
+                          ? textToChecklistItems(opp.requirements)
+                          : [])
+                      : [];
+
+                    const hasVaultChecklists = opp.category === 'Scholarships' && (vaultEligibilityItems.length > 0 || vaultRequirementsItems.length > 0);
+                    const hasVaultExpandedDetails = hasVaultChecklists || Boolean(opp.description) || Boolean(opp.feedback);
+
                     return (
-                      <tr key={opp.id} className="hover:bg-cream-50/50 dark:hover:bg-sepia-800/10 transition-colors">
-                        <td className="p-3.5 align-top">
-                          <div className="font-bold text-sepia-850 dark:text-cream-50 text-sm leading-snug">
-                            {opp.title}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] text-sepia-450 dark:text-sepia-500 font-medium font-sans">
-                            <span className="font-mono bg-cream-100 dark:bg-sepia-850 px-1.5 py-0.5 rounded text-sepia-700 dark:text-cream-200 border border-cream-200/50 dark:border-sepia-800">
-                              {opp.type || 'generic'}
+                      <React.Fragment key={opp.id}>
+                        <tr className="hover:bg-cream-50/50 dark:hover:bg-sepia-800/10 transition-colors">
+                          <td className="p-3.5 align-top">
+                            <div className="font-bold text-sepia-850 dark:text-cream-50 text-sm leading-snug">
+                              {opp.title}
+                            </div>
+                            <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] text-sepia-450 dark:text-sepia-500 font-medium font-sans">
+                              <span className="font-mono bg-cream-100 dark:bg-sepia-850 px-1.5 py-0.5 rounded text-sepia-700 dark:text-cream-200 border border-cream-200/50 dark:border-sepia-800">
+                                {opp.type || 'generic'}
+                              </span>
+                              <span>•</span>
+                              <span className="font-mono">{new Date(opp.timestamp).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                            </div>
+
+                            {opp.companyOrClient && (
+                              <div className="mt-1.5 text-xs text-amber-900 dark:text-amber-300 font-semibold flex items-center gap-1.5 font-sans">
+                                <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                                <span>{opp.companyOrClient}</span>
+                              </div>
+                            )}
+
+                            {opp.expectedValue && (
+                              <div className="mt-1 text-xs text-emerald-800 dark:text-emerald-300 font-semibold flex items-center gap-1.5 font-sans">
+                                <Coins className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                                <span>{opp.expectedValue}</span>
+                              </div>
+                            )}
+
+                            {opp.category === 'Scholarships' && opp.deadline && (
+                              <div className="mt-2 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 border border-amber-200/80 dark:border-amber-800/50">
+                                <Calendar className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
+                                <span>Deadline: <strong className="font-mono">{opp.deadline}</strong></span>
+                              </div>
+                            )}
+
+                            {/* Stored Attachment */}
+                            {opp.fileName && (
+                              <div className="mt-2 inline-flex items-center gap-1.5 bg-cream-50 dark:bg-sepia-850 px-2 py-1 rounded-md border border-cream-200 dark:border-sepia-800 text-[11px] font-sans">
+                                <FileText className="w-3.5 h-3.5 text-readflow-green shrink-0" />
+                                <span className="font-bold text-sepia-800 dark:text-cream-200">{opp.fileName}</span>
+                                <button
+                                  onClick={() => triggerDownload(opp)}
+                                  className="text-xs text-readflow-green hover:underline cursor-pointer flex items-center gap-0.5 ml-1"
+                                  title="Download attachment"
+                                >
+                                  <Download className="w-3 h-3" />
+                                </button>
+                              </div>
+                            )}
+                          </td>
+                          <td className="p-3.5 align-top">
+                            <span className={`inline-flex items-center gap-1 font-bold ${meta.text}`}>
+                              <Icon className="w-3.5 h-3.5" />
+                              {opp.category}
                             </span>
-                            <span>•</span>
-                            <span className="font-mono">{new Date(opp.timestamp).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                          </div>
-
-                          {opp.companyOrClient && (
-                            <div className="mt-1.5 text-xs text-amber-900 dark:text-amber-300 font-semibold flex items-center gap-1.5 font-sans">
-                              <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                              <span>{opp.companyOrClient}</span>
+                          </td>
+                          <td className="p-3.5 align-top text-sepia-400 dark:text-sepia-500 font-semibold">
+                            {opp.type}
+                          </td>
+                          <td className="p-3.5 align-top text-right font-mono font-bold text-sepia-800 dark:text-cream-100">
+                            +{opp.points}
+                          </td>
+                          <td className="p-3.5 align-top text-right text-sepia-400 dark:text-sepia-500 font-medium">
+                            {new Date(opp.timestamp).toLocaleDateString()}
+                          </td>
+                          <td className="p-3.5 align-top text-center">
+                            <div className="flex items-center justify-center gap-1.5">
+                              <button
+                                id={`vault-edit-btn-${opp.id}`}
+                                onClick={() => {
+                                  setEditingOppId(opp.id);
+                                  setEditTitle(opp.title);
+                                  setEditCategory(opp.category);
+                                  setEditType(opp.type);
+                                  setEditPoints(opp.points);
+                                  setEditTimestamp(opp.timestamp.substring(0, 10));
+                                  setEditCompanyOrClient(opp.companyOrClient || '');
+                                  setEditExpectedValue(opp.expectedValue || '');
+                                  setEditDescription(opp.description || '');
+                                  setEditFeedback(opp.feedback || '');
+                                  setEditEligibility(
+                                    opp.eligibility ||
+                                    (opp.eligibilityChecklist ? opp.eligibilityChecklist.map((i) => i.text).join('\n') : '')
+                                  );
+                                  setEditRequirements(
+                                    opp.requirements ||
+                                    (opp.requirementsChecklist ? opp.requirementsChecklist.map((i) => i.text).join('\n') : '')
+                                  );
+                                  setEditDeadline(opp.deadline || '');
+                                }}
+                                className="text-sepia-400 hover:text-readflow-green p-1.5 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all cursor-pointer"
+                                title="Edit"
+                              >
+                                <Edit2 className="w-3.5 h-3.5" />
+                              </button>
+                              <button
+                                id={`vault-delete-btn-${opp.id}`}
+                                onClick={() => {
+                                  if (confirm('Permanently delete this opportunity?')) {
+                                    onDeleteOpportunity(opp.id);
+                                  }
+                                }}
+                                className="text-sepia-400 hover:text-red-600 p-1.5 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all cursor-pointer"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
                             </div>
-                          )}
+                          </td>
+                        </tr>
 
-                          {opp.expectedValue && (
-                            <div className="mt-1 text-xs text-emerald-800 dark:text-emerald-300 font-semibold flex items-center gap-1.5 font-sans">
-                              <Coins className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                              <span>{opp.expectedValue}</span>
-                            </div>
-                          )}
+                        {/* Full-width Details & Scope in Vault */}
+                        {hasVaultExpandedDetails && (
+                          <tr
+                            key={`${opp.id}-vault-expanded`}
+                            className="hover:bg-cream-50/30 dark:hover:bg-sepia-800/10 transition-colors border-b border-cream-100 dark:border-sepia-800 !border-t-0"
+                          >
+                            <td colSpan={6} className="px-3.5 pb-3 pt-0">
+                              <div className="space-y-2">
+                                {/* Checklists if any */}
+                                {hasVaultChecklists && (
+                                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5 pt-1">
+                                    {/* Eligibility Checklist */}
+                                    <div className="p-2 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-150 dark:border-blue-900/40">
+                                      <div className="flex items-center justify-between gap-2 mb-1">
+                                        <div className="text-[10px] font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1">
+                                          <CheckSquare className="w-3 h-3 text-blue-600 dark:text-blue-400" />
+                                          <span>Eligibility Criteria Checklist</span>
+                                        </div>
+                                        <span className="text-[9px] font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 px-1 rounded">
+                                          {vaultEligibilityItems.filter((i) => i.completed).length}/{vaultEligibilityItems.length} Met
+                                        </span>
+                                      </div>
+                                      {vaultEligibilityItems.length === 0 ? (
+                                        <p className="text-[10px] text-sepia-400 italic">No eligibility criteria logged.</p>
+                                      ) : (
+                                        <div className="space-y-0.5">
+                                          {vaultEligibilityItems.map((item) => (
+                                            <label
+                                              key={item.id}
+                                              className="flex items-start gap-1.5 p-0.5 rounded hover:bg-white/60 dark:hover:bg-sepia-900/40 transition-colors cursor-pointer text-xs"
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={item.completed}
+                                                onChange={() => handleToggleEligibilityItem(opp, item.id)}
+                                                className="mt-0.5 accent-blue-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
+                                              />
+                                              <span className={item.completed ? 'line-through text-sepia-400 dark:text-sepia-500 font-normal' : 'text-sepia-800 dark:text-cream-100 font-medium'}>
+                                                {item.text}
+                                              </span>
+                                            </label>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
 
-                          {/* SCHOLARSHIP SECTION: Eligibility Checklist, Requirements Checklist & Deadline */}
-                          {opp.category === 'Scholarships' && (() => {
-                            const eligibilityItems = opp.eligibilityChecklist && opp.eligibilityChecklist.length > 0
-                              ? opp.eligibilityChecklist
-                              : opp.eligibility
-                              ? textToChecklistItems(opp.eligibility)
-                              : [];
-                            const requirementsItems = opp.requirementsChecklist && opp.requirementsChecklist.length > 0
-                              ? opp.requirementsChecklist
-                              : opp.requirements
-                              ? textToChecklistItems(opp.requirements)
-                              : [];
-
-                            return (
-                              <div className="mt-2.5 space-y-2">
-                                {opp.deadline && (
-                                  <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200 border border-amber-200/80 dark:border-amber-800/50">
-                                    <Calendar className="w-3 h-3 text-amber-600 dark:text-amber-400 shrink-0" />
-                                    <span>Deadline: <strong className="font-mono">{opp.deadline}</strong></span>
+                                    {/* Requirements Checklist */}
+                                    <div className="p-2 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-150 dark:border-indigo-900/40">
+                                      <div className="flex items-center justify-between gap-2 mb-1">
+                                        <div className="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1">
+                                          <ListChecks className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                                          <span>Application Requirements Checklist</span>
+                                        </div>
+                                        <span className="text-[9px] font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-1 rounded">
+                                          {vaultRequirementsItems.filter((i) => i.completed).length}/{vaultRequirementsItems.length} Ready
+                                        </span>
+                                      </div>
+                                      {vaultRequirementsItems.length === 0 ? (
+                                        <p className="text-[10px] text-sepia-400 italic">No requirements logged.</p>
+                                      ) : (
+                                        <div className="space-y-0.5">
+                                          {vaultRequirementsItems.map((item) => (
+                                            <label
+                                              key={item.id}
+                                              className="flex items-start gap-1.5 p-0.5 rounded hover:bg-white/60 dark:hover:bg-sepia-900/40 transition-colors cursor-pointer text-xs"
+                                            >
+                                              <input
+                                                type="checkbox"
+                                                checked={item.completed}
+                                                onChange={() => handleToggleRequirementItem(opp, item.id)}
+                                                className="mt-0.5 accent-indigo-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
+                                              />
+                                              <span className={item.completed ? 'line-through text-sepia-400 dark:text-sepia-500 font-normal' : 'text-sepia-800 dark:text-cream-100 font-medium'}>
+                                                {item.text}
+                                              </span>
+                                            </label>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
                                   </div>
                                 )}
 
-                                {/* Eligibility Checklist */}
-                                <div className="p-2 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-150 dark:border-blue-900/40">
-                                  <div className="flex items-center justify-between gap-2 mb-1">
-                                    <div className="text-[10px] font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1">
-                                      <CheckSquare className="w-3 h-3 text-blue-600 dark:text-blue-400" />
-                                      <span>Eligibility Criteria Checklist</span>
-                                    </div>
-                                    <span className="text-[9px] font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 px-1 rounded">
-                                      {eligibilityItems.filter((i) => i.completed).length}/{eligibilityItems.length} Met
+                                {/* Full-width Details & Scope */}
+                                {opp.description && (
+                                  <div className="w-full text-xs text-sepia-700 dark:text-sepia-300 bg-cream-50/70 dark:bg-sepia-850/60 p-2.5 rounded-lg border border-cream-200/70 dark:border-sepia-800 font-sans leading-relaxed">
+                                    <span className="font-bold block mb-1 text-[9px] uppercase font-mono tracking-wider text-sepia-450 dark:text-sepia-400">
+                                      {opp.category === 'Scholarships' ? 'Additional Notes & Prompts:' : 'Details & Scope:'}
                                     </span>
+                                    <FormattedText text={opp.description} />
                                   </div>
-                                  {eligibilityItems.length === 0 ? (
-                                    <p className="text-[10px] text-sepia-400 italic">No eligibility criteria logged.</p>
-                                  ) : (
-                                    <div className="space-y-0.5">
-                                      {eligibilityItems.map((item) => (
-                                        <label
-                                          key={item.id}
-                                          className="flex items-start gap-1.5 p-0.5 rounded hover:bg-white/60 dark:hover:bg-sepia-900/40 transition-colors cursor-pointer text-xs"
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={item.completed}
-                                            onChange={() => handleToggleEligibilityItem(opp, item.id)}
-                                            className="mt-0.5 accent-blue-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
-                                          />
-                                          <span className={item.completed ? 'line-through text-sepia-400 dark:text-sepia-500 font-normal' : 'text-sepia-800 dark:text-cream-100 font-medium'}>
-                                            {item.text}
-                                          </span>
-                                        </label>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
+                                )}
 
-                                {/* Requirements Checklist */}
-                                <div className="p-2 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-150 dark:border-indigo-900/40">
-                                  <div className="flex items-center justify-between gap-2 mb-1">
-                                    <div className="text-[10px] font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1">
-                                      <ListChecks className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
-                                      <span>Application Requirements Checklist</span>
+                                {/* Full-width Qualitative Feedback */}
+                                {opp.feedback && (
+                                  <div className="w-full text-xs text-sepia-800 dark:text-cream-200 bg-amber-50/50 dark:bg-amber-950/20 p-2 rounded-lg border border-amber-200/60 dark:border-amber-900/30 flex items-start gap-1.5 font-sans">
+                                    <MessageSquare className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
+                                    <div>
+                                      <span className="font-bold block text-[9px] uppercase font-mono tracking-wider text-amber-800 dark:text-amber-400">Feedback / Reflection:</span>
+                                      <span>{opp.feedback}</span>
                                     </div>
-                                    <span className="text-[9px] font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-1 rounded">
-                                      {requirementsItems.filter((i) => i.completed).length}/{requirementsItems.length} Ready
-                                    </span>
                                   </div>
-                                  {requirementsItems.length === 0 ? (
-                                    <p className="text-[10px] text-sepia-400 italic">No requirements logged.</p>
-                                  ) : (
-                                    <div className="space-y-0.5">
-                                      {requirementsItems.map((item) => (
-                                        <label
-                                          key={item.id}
-                                          className="flex items-start gap-1.5 p-0.5 rounded hover:bg-white/60 dark:hover:bg-sepia-900/40 transition-colors cursor-pointer text-xs"
-                                        >
-                                          <input
-                                            type="checkbox"
-                                            checked={item.completed}
-                                            onChange={() => handleToggleRequirementItem(opp, item.id)}
-                                            className="mt-0.5 accent-indigo-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
-                                          />
-                                          <span className={item.completed ? 'line-through text-sepia-400 dark:text-sepia-500 font-normal' : 'text-sepia-800 dark:text-cream-100 font-medium'}>
-                                            {item.text}
-                                          </span>
-                                        </label>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
+                                )}
                               </div>
-                            );
-                          })()}
-
-                          {/* Full Description & Notes */}
-                          {opp.description && (
-                            <div className="mt-2 text-xs text-sepia-700 dark:text-sepia-300 bg-cream-50/70 dark:bg-sepia-850/60 p-2 rounded-lg border border-cream-200/70 dark:border-sepia-800 font-sans leading-relaxed">
-                              <span className="font-bold block mb-0.5 text-[9px] uppercase font-mono tracking-wider text-sepia-450 dark:text-sepia-400">
-                                {opp.category === 'Scholarships' ? 'Additional Notes & Prompts:' : 'Details & Scope:'}
-                              </span>
-                              <FormattedText text={opp.description} />
-                            </div>
-                          )}
-
-                          {/* Full Qualitative Feedback */}
-                          {opp.feedback && (
-                            <div className="mt-1.5 text-xs text-sepia-800 dark:text-cream-200 bg-amber-50/50 dark:bg-amber-950/20 p-2 rounded-lg border border-amber-200/60 dark:border-amber-900/30 flex items-start gap-1.5 font-sans">
-                              <MessageSquare className="w-3.5 h-3.5 text-amber-600 shrink-0 mt-0.5" />
-                              <div>
-                                <span className="font-bold block text-[9px] uppercase font-mono tracking-wider text-amber-800 dark:text-amber-400">Feedback / Reflection:</span>
-                                <span>{opp.feedback}</span>
-                              </div>
-                            </div>
-                          )}
-
-                          {/* Stored Attachment */}
-                          {opp.fileName && (
-                            <div className="mt-1.5 inline-flex items-center gap-1.5 bg-cream-50 dark:bg-sepia-850 px-2 py-1 rounded-md border border-cream-200 dark:border-sepia-800 text-[11px] font-sans">
-                              <FileText className="w-3.5 h-3.5 text-readflow-green shrink-0" />
-                              <span className="font-bold text-sepia-800 dark:text-cream-200">{opp.fileName}</span>
-                              <button
-                                onClick={() => triggerDownload(opp)}
-                                className="text-xs text-readflow-green hover:underline cursor-pointer flex items-center gap-0.5 ml-1"
-                                title="Download attachment"
-                              >
-                                <Download className="w-3 h-3" />
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                        <td className="p-3.5 align-top">
-                          <span className={`inline-flex items-center gap-1 font-bold ${meta.text}`}>
-                            <Icon className="w-3.5 h-3.5" />
-                            {opp.category}
-                          </span>
-                        </td>
-                        <td className="p-3.5 align-top text-sepia-400 dark:text-sepia-500 font-semibold">
-                          {opp.type}
-                        </td>
-                        <td className="p-3.5 align-top text-right font-mono font-bold text-sepia-800 dark:text-cream-100">
-                          +{opp.points}
-                        </td>
-                        <td className="p-3.5 align-top text-right text-sepia-400 dark:text-sepia-500 font-medium">
-                          {new Date(opp.timestamp).toLocaleDateString()}
-                        </td>
-                        <td className="p-3.5 align-top text-center">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <button
-                              id={`vault-edit-btn-${opp.id}`}
-                              onClick={() => {
-                                setEditingOppId(opp.id);
-                                setEditTitle(opp.title);
-                                setEditCategory(opp.category);
-                                setEditType(opp.type);
-                                setEditPoints(opp.points);
-                                setEditTimestamp(opp.timestamp.substring(0, 10));
-                                setEditCompanyOrClient(opp.companyOrClient || '');
-                                setEditExpectedValue(opp.expectedValue || '');
-                                setEditDescription(opp.description || '');
-                                setEditFeedback(opp.feedback || '');
-                                setEditEligibility(
-                                  opp.eligibility ||
-                                  (opp.eligibilityChecklist ? opp.eligibilityChecklist.map((i) => i.text).join('\n') : '')
-                                );
-                                setEditRequirements(
-                                  opp.requirements ||
-                                  (opp.requirementsChecklist ? opp.requirementsChecklist.map((i) => i.text).join('\n') : '')
-                                );
-                                setEditDeadline(opp.deadline || '');
-                              }}
-                              className="text-sepia-400 hover:text-readflow-green p-1 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all cursor-pointer"
-                              title="Edit record"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" />
-                            </button>
-                            <button
-                              id={`vault-del-btn-${opp.id}`}
-                              onClick={() => onDeleteOpportunity(opp.id)}
-                              className="text-sepia-300 hover:text-red-500 p-1 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all cursor-pointer"
-                              title="Delete permanently"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
                     );
                   })
                 )}

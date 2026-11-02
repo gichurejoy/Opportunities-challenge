@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { Opportunity, OpportunityPipeline, Vision, ChecklistHabit, isChecklistOpportunity, textToChecklistItems } from '../types';
+import { Opportunity, OpportunityPipeline, Vision, ChecklistHabit, isChecklistOpportunity, textToChecklistItems, OpportunityActivity } from '../types';
 import {
   Search,
   Filter,
@@ -26,11 +26,26 @@ import {
   ListChecks,
   Calendar,
   GraduationCap,
-  Tag
+  Tag,
+  Unlink,
+  History,
+  ChevronDown,
+  ChevronUp,
+  Send,
+  CheckCircle2,
+  ArrowRight,
+  Sparkles,
+  FileSpreadsheet
 } from 'lucide-react';
 import { CATEGORY_METADATA } from './QuickLogger';
 import { getCategoryFieldConfig } from '../utils/categoryFields';
 import { FormattedText } from './FormattedText';
+import { 
+  getPipelineTemplateForCategory, 
+  getStagesForCategory, 
+  ALL_SYSTEM_STAGES, 
+  getStageBadgeStyle 
+} from '../utils/pipelineStages';
 
 interface OpportunitiesLogbookProps {
   opportunities: Opportunity[];
@@ -40,21 +55,14 @@ interface OpportunitiesLogbookProps {
   onUpdateOpportunity: (updatedOpp: Opportunity) => void;
   onDeleteOpportunity: (id: string) => void;
   onAddPipeline: (newPipe: Omit<OpportunityPipeline, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  onUpdatePipeline?: (pipe: OpportunityPipeline) => void;
   onNavigateToDashboard: () => void;
   onSelectPipeline: (id: string) => void;
+  onOpenCSVImport?: () => void;
+  onOpenAIParser?: () => void;
 }
 
-const STAGES = [
-  'Sourced',
-  'Applied',
-  'Contacted',
-  'Interviewing',
-  'Offer',
-  'Won 🎉',
-  'Lost',
-  'Completed',
-  'Active'
-];
+const STAGES = ALL_SYSTEM_STAGES;
 
 export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   opportunities,
@@ -64,8 +72,11 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   onUpdateOpportunity,
   onDeleteOpportunity,
   onAddPipeline,
+  onUpdatePipeline,
   onNavigateToDashboard,
   onSelectPipeline,
+  onOpenCSVImport,
+  onOpenAIParser,
 }) => {
   // Filters & State
   const [searchQuery, setSearchQuery] = useState('');
@@ -75,6 +86,11 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   const [sortBy, setSortBy] = useState<'date-desc' | 'date-asc' | 'points-desc' | 'title-asc' | 'deadline-asc'>('date-desc');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
+
+  // Expanded row and tab selection state
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
+  const [activeTabMap, setActiveTabMap] = useState<Record<string, 'details' | 'timeline'>>({});
+  const [quickNoteInputs, setQuickNoteInputs] = useState<Record<string, string>>({});
 
   // Inline editing states
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -102,6 +118,11 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
   // Drag and drop / upload refs
   const fileInputRefs = useRef<{ [key: string]: HTMLInputElement | null }>({});
   const [dragActiveId, setDragActiveId] = useState<string | null>(null);
+
+  // Batch selection states
+  const [selectedOppIds, setSelectedOppIds] = useState<string[]>([]);
+  const [batchStage, setBatchStage] = useState<string>(ALL_SYSTEM_STAGES[0]);
+  const [batchTagInput, setBatchTagInput] = useState<string>('');
 
   // Exclude checklist habits from Opportunities Logbook
   const logbookOpportunities = React.useMemo(() => {
@@ -242,7 +263,8 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
 
     const matchesCategory = selectedCategory === 'All' || opp.category === selectedCategory;
 
-    const currentOppStage = opp.stage || 'Sourced';
+    const defaultStage = getPipelineTemplateForCategory(opp.category).stages[0];
+    const currentOppStage = opp.stage || defaultStage;
     const matchesStage = selectedStage === 'All' || currentOppStage === selectedStage;
 
     const matchesTags =
@@ -337,7 +359,8 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
     setEditExpectedValue(opp.expectedValue || '');
     setEditPoints(opp.points);
     setEditFeedback(opp.feedback || '');
-    setEditStage(opp.stage || 'Sourced');
+    const defaultStage = getPipelineTemplateForCategory(opp.category).stages[0];
+    setEditStage(opp.stage || defaultStage);
     setEditDate(opp.timestamp.substring(0, 10));
     setEditLinkedVisionId(opp.linkedVisionId || '');
     setEditDescription(opp.description || '');
@@ -496,21 +519,19 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
         if (el) el.scrollIntoView({ behavior: 'smooth' });
       }, 150);
     } else {
-      // Create a brand-new pipeline for this opportunity
-      const presetStages = [
-        { name: 'Lead Sourced', completedAt: new Date().toISOString() },
-        { name: 'Application Prepared' },
-        { name: 'First Correspondence' },
-        { name: 'Interview Loop' },
-        { name: 'Offer Secured' }
-      ];
+      // Create a brand-new pipeline for this opportunity with category-specific standardized stages
+      const template = getPipelineTemplateForCategory(opp.category);
+      const presetStages = template.stages.map((stgName, idx) => ({
+        name: stgName,
+        completedAt: idx === 0 ? new Date().toISOString() : undefined,
+      }));
 
       const newPipelineId = `pipe-${Date.now()}`;
       
       const newPipeline: OpportunityPipeline = {
         id: newPipelineId,
         title: `${opp.title} (${opp.type || 'Opportunity'})`,
-        type: opp.category === 'Career' ? 'Job' : opp.category === 'Finance' ? 'Scholarship' : 'Custom',
+        type: template.type,
         companyOrClient: opp.companyOrClient,
         expectedValue: opp.expectedValue,
         stages: presetStages,
@@ -518,6 +539,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
         status: 'active',
         notes: `Automatically generated tracker connected to opportunity logged on ${new Date(opp.timestamp).toLocaleDateString()}.${opp.companyOrClient ? `\nTarget: ${opp.companyOrClient}` : ''}${opp.expectedValue ? `\nExpected Value: ${opp.expectedValue}` : ''}${opp.description ? `\n\nJob Description / Enquiry:\n${opp.description}` : ''}\n\nFeedback Log: ${opp.feedback || 'None yet'}`,
         category: opp.category,
+        linkedOpportunityId: opp.id,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -525,11 +547,11 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
       // Call state change
       onAddPipeline(newPipeline);
       
-      // Update opportunity link
+      // Update opportunity link and set stage to first standardized stage of the pipeline!
       onUpdateOpportunity({
         ...opp,
         pipelineId: newPipelineId,
-        stage: 'Active'
+        stage: template.stages[0],
       });
 
       // Select it and go
@@ -540,6 +562,161 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
         const el = document.getElementById('pipeline-panel');
         if (el) el.scrollIntoView({ behavior: 'smooth' });
       }, 150);
+    }
+  };
+
+  // Unlinked pipelines helper
+  const unlinkedPipelines = React.useMemo(() => {
+    const linkedPipeIds = new Set(opportunities.filter((o) => o.pipelineId).map((o) => o.pipelineId));
+    return pipelines.filter((p) => (!p.linkedOpportunityId || p.linkedOpportunityId === '') && !linkedPipeIds.has(p.id));
+  }, [pipelines, opportunities]);
+
+  // Link existing pipeline
+  const handleLinkExistingPipeline = (opp: Opportunity, chosenPipeId: string) => {
+    const chosenPipe = pipelines.find((p) => p.id === chosenPipeId);
+    onUpdateOpportunity({
+      ...opp,
+      pipelineId: chosenPipeId,
+    });
+    if (chosenPipe && onUpdatePipeline) {
+      onUpdatePipeline({
+        ...chosenPipe,
+        linkedOpportunityId: opp.id,
+        companyOrClient: chosenPipe.companyOrClient || opp.companyOrClient,
+        expectedValue: chosenPipe.expectedValue || opp.expectedValue,
+      });
+    }
+  };
+
+  // Unlink pipeline
+  const handleUnlinkPipeline = (opp: Opportunity) => {
+    const pipeId = opp.pipelineId;
+    onUpdateOpportunity({
+      ...opp,
+      pipelineId: undefined,
+    });
+    if (pipeId && onUpdatePipeline) {
+      const pipe = pipelines.find((p) => p.id === pipeId);
+      if (pipe && pipe.linkedOpportunityId === opp.id) {
+        onUpdatePipeline({
+          ...pipe,
+          linkedOpportunityId: undefined,
+        });
+      }
+    }
+  };
+
+  // Batch selection helpers
+  const isAllPageSelected = paginatedOpps.length > 0 && paginatedOpps.every((o) => selectedOppIds.includes(o.id));
+
+  const handleToggleSelectAll = () => {
+    if (isAllPageSelected) {
+      const pageIds = new Set(paginatedOpps.map((o) => o.id));
+      setSelectedOppIds((prev) => prev.filter((id) => !pageIds.has(id)));
+    } else {
+      const pageIds = paginatedOpps.map((o) => o.id);
+      setSelectedOppIds((prev) => Array.from(new Set([...prev, ...pageIds])));
+    }
+  };
+
+  const handleSelectAllFiltered = () => {
+    setSelectedOppIds(filteredOpps.map((o) => o.id));
+  };
+
+  const handleClearSelection = () => {
+    setSelectedOppIds([]);
+  };
+
+  const handleToggleSelectOne = (id: string) => {
+    setSelectedOppIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id]
+    );
+  };
+
+  // Batch operations
+  const handleBatchStageUpdate = () => {
+    if (selectedOppIds.length === 0) return;
+    selectedOppIds.forEach((id) => {
+      const opp = opportunities.find((o) => o.id === id);
+      if (opp) {
+        onUpdateOpportunity({
+          ...opp,
+          stage: batchStage,
+        });
+      }
+    });
+  };
+
+  const handleBatchAddTag = () => {
+    if (!batchTagInput.trim() || selectedOppIds.length === 0) return;
+    const tag = batchTagInput.startsWith('#') ? batchTagInput.trim() : `#${batchTagInput.trim()}`;
+    selectedOppIds.forEach((id) => {
+      const opp = opportunities.find((o) => o.id === id);
+      if (opp) {
+        const existing = opp.tags || [];
+        if (!existing.includes(tag)) {
+          onUpdateOpportunity({
+            ...opp,
+            tags: [...existing, tag],
+          });
+        }
+      }
+    });
+    setBatchTagInput('');
+  };
+
+  const handleBatchExportCSV = () => {
+    const selectedOpps = logbookOpportunities.filter((opp) => selectedOppIds.includes(opp.id));
+    if (selectedOpps.length === 0) return;
+
+    const headers = [
+      'Title',
+      'Target Company/Client',
+      'Expected Salary/Grant/Value',
+      'Category',
+      'Subtype/Tag',
+      'Score Points',
+      'Stage Status',
+      'Qualitative Notes/Feedback',
+      'Logged Date',
+      'Linked Vision/Goal ID'
+    ];
+    const rows = selectedOpps.map((opp) => [
+      `"${opp.title.replace(/"/g, '""')}"`,
+      `"${(opp.companyOrClient || '').replace(/"/g, '""')}"`,
+      `"${(opp.expectedValue || '').replace(/"/g, '""')}"`,
+      `"${opp.category}"`,
+      `"${(opp.type || '').replace(/"/g, '""')}"`,
+      opp.points,
+      `"${(opp.stage || 'Sourced').replace(/"/g, '""')}"`,
+      `"${(opp.feedback || opp.description || '').replace(/"/g, '""')}"`,
+      `"${new Date(opp.timestamp).toLocaleDateString()}"`,
+      `"${opp.linkedVisionId || ''}"`
+    ]);
+    
+    const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((e) => e.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `opportunities_batch_export_${new Date().toISOString().slice(0, 10)}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleBatchDelete = () => {
+    if (selectedOppIds.length === 0) return;
+    if (
+      confirm(
+        `Are you sure you want to permanently delete the ${selectedOppIds.length} selected opportunit${
+          selectedOppIds.length > 1 ? 'ies' : 'y'
+        }? This action cannot be undone.`
+      )
+    ) {
+      selectedOppIds.forEach((id) => onDeleteOpportunity(id));
+      setSelectedOppIds([]);
     }
   };
 
@@ -563,6 +740,40 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
     }
   };
 
+  // Activity timeline & expanded row handlers
+  const handleToggleRowExpand = (oppId: string, defaultTab?: 'details' | 'timeline') => {
+    setExpandedRows((prev) => {
+      const isCurrentlyExpanded = Boolean(prev[oppId]);
+      return { ...prev, [oppId]: !isCurrentlyExpanded };
+    });
+    if (defaultTab) {
+      setActiveTabMap((prev) => ({ ...prev, [oppId]: defaultTab }));
+    }
+  };
+
+  const handleSelectRowTab = (oppId: string, tab: 'details' | 'timeline') => {
+    setActiveTabMap((prev) => ({ ...prev, [oppId]: tab }));
+    setExpandedRows((prev) => ({ ...prev, [oppId]: true }));
+  };
+
+  const handleAddActivityNote = (opp: Opportunity) => {
+    const text = (quickNoteInputs[opp.id] || '').trim();
+    if (!text) return;
+    const newActivity: OpportunityActivity = {
+      id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      type: 'note',
+      title: 'Manual Note Added',
+      details: text,
+    };
+    const nextLog = [newActivity, ...(opp.activityLog || [])];
+    onUpdateOpportunity({
+      ...opp,
+      activityLog: nextLog,
+    });
+    setQuickNoteInputs((prev) => ({ ...prev, [opp.id]: '' }));
+  };
+
   return (
     <div className="space-y-6 animate-fadeIn font-sans">
       {/* Upper KPIs Banner */}
@@ -572,27 +783,27 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
             <Clock className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[10px] uppercase font-mono font-bold text-sepia-400 dark:text-sepia-500">Total Opportunities</span>
+            <span className="text-[10px] uppercase font-mono font-bold text-sepia-400 dark:text-cream-300">Total Opportunities</span>
             <h4 className="text-xl font-bold font-mono text-sepia-900 dark:text-cream-100">{opportunities.length}</h4>
           </div>
         </div>
 
         <div className="bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-800 rounded-xl p-4 flex items-center gap-4 shadow-sm">
-          <div className="w-10 h-10 rounded-lg bg-cream-50 dark:bg-sepia-800 flex items-center justify-center text-readflow-gold">
+          <div className="w-10 h-10 rounded-lg bg-cream-50 dark:bg-sepia-800 flex items-center justify-center text-readflow-gold dark:text-readflow-lightgold">
             <Award className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[10px] uppercase font-mono font-bold text-sepia-400 dark:text-sepia-500">Combined Quality Score</span>
+            <span className="text-[10px] uppercase font-mono font-bold text-sepia-400 dark:text-cream-300">Combined Quality Score</span>
             <h4 className="text-xl font-bold font-mono text-sepia-900 dark:text-cream-100">{totalPoints} pts</h4>
           </div>
         </div>
 
         <div className="bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-800 rounded-xl p-4 flex items-center gap-4 shadow-sm">
-          <div className="w-10 h-10 rounded-lg bg-cream-50 dark:bg-sepia-800 flex items-center justify-center text-readflow-olive">
+          <div className="w-10 h-10 rounded-lg bg-cream-50 dark:bg-sepia-800 flex items-center justify-center text-readflow-olive dark:text-readflow-lightolive">
             <FileText className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[10px] uppercase font-mono font-bold text-sepia-400 dark:text-sepia-500">Stored Attachments</span>
+            <span className="text-[10px] uppercase font-mono font-bold text-sepia-400 dark:text-cream-300">Stored Attachments</span>
             <h4 className="text-xl font-bold font-mono text-sepia-900 dark:text-cream-100">{totalFiles} files</h4>
           </div>
         </div>
@@ -602,7 +813,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
             <GitBranch className="w-5 h-5" />
           </div>
           <div>
-            <span className="text-[10px] uppercase font-mono font-bold text-sepia-400 dark:text-sepia-500">Pipeline Integrations</span>
+            <span className="text-[10px] uppercase font-mono font-bold text-sepia-400 dark:text-cream-300">Pipeline Integrations</span>
             <h4 className="text-xl font-bold font-mono text-sepia-900 dark:text-cream-100">{activePipelineLinks} active</h4>
           </div>
         </div>
@@ -616,11 +827,35 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
               <FileText className="w-5 h-5 text-readflow-gold" />
               Opportunities Logbook & Auditor
             </h2>
-            <p className="text-xs text-sepia-400 dark:text-sepia-500 mt-0.5">
+            <p className="text-xs text-sepia-400 dark:text-cream-300 mt-0.5">
               Refined inspection of all documented attempts, feedback comments, active pipeline connections, and files.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {onOpenAIParser && (
+              <button
+                type="button"
+                id="logbook-ai-assistant-btn"
+                onClick={onOpenAIParser}
+                className="flex items-center gap-1.5 px-3 py-2 bg-readflow-green/10 hover:bg-readflow-green/20 dark:bg-readflow-lightgreen/15 dark:hover:bg-readflow-lightgreen/25 text-readflow-green dark:text-readflow-lightgreen border border-readflow-green/30 text-xs font-bold rounded-lg transition-all cursor-pointer shadow-xs"
+                title="AI Opportunity Parser & Pitch Generator"
+              >
+                <Sparkles className="w-3.5 h-3.5" />
+                AI Assistant
+              </button>
+            )}
+            {onOpenCSVImport && (
+              <button
+                type="button"
+                id="logbook-import-csv-btn"
+                onClick={onOpenCSVImport}
+                className="flex items-center gap-1.5 px-3 py-2 bg-cream-100 hover:bg-cream-150 dark:bg-sepia-800 dark:hover:bg-sepia-750 text-sepia-800 dark:text-cream-200 border border-cream-200 dark:border-sepia-700 text-xs font-bold rounded-lg transition-all cursor-pointer shadow-xs"
+                title="Import opportunities from CSV / Excel"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5 text-readflow-green" />
+                Import CSV
+              </button>
+            )}
             <button
               id="export-csv-btn"
               onClick={exportToCSV}
@@ -678,7 +913,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
               className="w-full px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-cream-50/20 dark:bg-sepia-900 text-sepia-700 dark:text-cream-200 focus:outline-none focus:ring-1 focus:ring-readflow-green cursor-pointer font-medium"
             >
               <option value="All">All Stages</option>
-              {STAGES.map((stg) => (
+              {(selectedCategory === 'All' ? ALL_SYSTEM_STAGES : getStagesForCategory(selectedCategory)).map((stg) => (
                 <option key={stg} value={stg}>{stg}</option>
               ))}
             </select>
@@ -704,7 +939,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
         {/* Multi-Tagging Filter Pill Bar */}
         <div className="pt-2.5 border-t border-cream-150 dark:border-sepia-800 flex flex-wrap items-center justify-between gap-2">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] font-mono font-bold text-sepia-400 dark:text-sepia-500 flex items-center gap-1 mr-1">
+            <span className="text-[11px] font-mono font-bold text-sepia-500 dark:text-cream-300 flex items-center gap-1 mr-1">
               <Tag className="w-3 h-3 text-readflow-gold" />
               Tags:
             </span>
@@ -717,7 +952,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
               className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-bold transition-all cursor-pointer ${
                 selectedTags.length === 0
                   ? 'bg-readflow-green text-cream-50 shadow-xs'
-                  : 'bg-cream-100 dark:bg-sepia-850 text-sepia-650 dark:text-cream-300 hover:bg-cream-200 dark:hover:bg-sepia-800 border border-cream-200 dark:border-sepia-750'
+                  : 'bg-cream-100 dark:bg-sepia-800 text-sepia-700 dark:text-cream-200 hover:bg-cream-200 dark:hover:bg-sepia-750 border border-cream-200 dark:border-sepia-700'
               }`}
             >
               All Tags ({logbookOpportunities.length})
@@ -736,12 +971,12 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                   className={`px-2.5 py-1 rounded-full text-[10px] font-mono transition-all flex items-center gap-1 cursor-pointer ${
                     isSelected
                       ? 'bg-readflow-green text-cream-50 font-bold shadow-xs'
-                      : 'bg-cream-100 dark:bg-sepia-850 text-sepia-650 dark:text-cream-300 hover:bg-cream-200 dark:hover:bg-sepia-800 border border-cream-200 dark:border-sepia-750'
+                      : 'bg-cream-100 dark:bg-sepia-800 text-sepia-700 dark:text-cream-200 hover:bg-cream-200 dark:hover:bg-sepia-750 border border-cream-200 dark:border-sepia-700'
                   }`}
                 >
                   <span>{tag}</span>
-                  <span className={`px-1 py-0.2 rounded-full text-[9px] ${
-                    isSelected ? 'bg-black/20 text-cream-50' : 'bg-cream-200/80 dark:bg-sepia-800 text-sepia-500'
+                  <span className={`px-1.5 py-0.2 rounded-full text-[9px] font-bold ${
+                    isSelected ? 'bg-black/20 text-cream-50' : 'bg-cream-200/80 dark:bg-sepia-700 text-sepia-600 dark:text-cream-200'
                   }`}>
                     {count}
                   </span>
@@ -763,12 +998,132 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
         </div>
       </div>
 
+      {/* Batch Operations Floating / Sticky Bar */}
+      {selectedOppIds.length > 0 && (
+        <div
+          id="batch-operations-bar"
+          className="sticky top-20 z-20 p-3.5 bg-white/95 dark:bg-sepia-900/95 backdrop-blur-md border-2 border-readflow-green/60 dark:border-readflow-lightgreen/60 rounded-xl shadow-xl flex flex-wrap items-center justify-between gap-3 animate-fadeIn"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-readflow-green animate-pulse" />
+              <span className="text-xs font-mono font-bold text-sepia-900 dark:text-cream-100">
+                {selectedOppIds.length} selected
+              </span>
+            </div>
+            <div className="h-4 w-px bg-cream-200 dark:bg-sepia-800" />
+            <button
+              type="button"
+              id="batch-select-all-filtered-btn"
+              onClick={handleSelectAllFiltered}
+              className="text-[11px] font-bold text-readflow-green dark:text-readflow-lightgreen hover:underline cursor-pointer"
+            >
+              Select All Filtered ({filteredOpps.length})
+            </button>
+            <button
+              type="button"
+              id="batch-clear-selection-btn"
+              onClick={handleClearSelection}
+              className="text-[11px] font-bold text-sepia-400 hover:text-sepia-700 dark:hover:text-cream-200 hover:underline cursor-pointer"
+            >
+              Deselect All
+            </button>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2.5">
+            {/* Batch Stage Update */}
+            <div className="flex items-center gap-1 bg-cream-50 dark:bg-sepia-850 p-1 rounded-lg border border-cream-200 dark:border-sepia-800">
+              <select
+                id="batch-stage-select"
+                value={batchStage}
+                onChange={(e) => setBatchStage(e.target.value)}
+                className="text-xs font-bold bg-transparent text-sepia-850 dark:text-cream-100 px-2 py-1 outline-none cursor-pointer"
+              >
+                {ALL_SYSTEM_STAGES.map((stg) => (
+                  <option key={stg} value={stg} className="bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100">
+                    {stg}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                id="batch-apply-stage-btn"
+                onClick={handleBatchStageUpdate}
+                className="text-[11px] font-bold px-2.5 py-1 bg-readflow-green hover:bg-readflow-olive text-cream-50 rounded-md transition-colors cursor-pointer shadow-xs"
+              >
+                Set Stage
+              </button>
+            </div>
+
+            {/* Batch Tag Input */}
+            <div className="flex items-center gap-1 bg-cream-50 dark:bg-sepia-850 p-1 rounded-lg border border-cream-200 dark:border-sepia-800">
+              <input
+                id="batch-tag-input"
+                type="text"
+                value={batchTagInput}
+                onChange={(e) => setBatchTagInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleBatchAddTag();
+                  }
+                }}
+                placeholder="e.g. #urgent"
+                className="w-24 text-xs bg-transparent px-2 py-1 text-sepia-850 dark:text-cream-100 placeholder-sepia-400 outline-none"
+              />
+              <button
+                type="button"
+                id="batch-apply-tag-btn"
+                onClick={handleBatchAddTag}
+                className="text-[11px] font-bold px-2.5 py-1 bg-readflow-green hover:bg-readflow-olive text-cream-50 rounded-md transition-colors cursor-pointer shadow-xs"
+              >
+                Add Tag
+              </button>
+            </div>
+
+            {/* Batch Export */}
+            <button
+              type="button"
+              id="batch-export-csv-btn"
+              onClick={handleBatchExportCSV}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg border border-cream-200 dark:border-sepia-800 text-sepia-700 dark:text-cream-200 hover:bg-cream-100 dark:hover:bg-sepia-800 transition-colors cursor-pointer"
+              title="Export selected rows as CSV"
+            >
+              <Download className="w-3.5 h-3.5 text-readflow-green" />
+              Export CSV
+            </button>
+
+            {/* Batch Delete */}
+            <button
+              type="button"
+              id="batch-delete-btn"
+              onClick={handleBatchDelete}
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-bold rounded-lg bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-900/50 text-red-600 dark:text-red-400 border border-red-200 dark:border-red-900/50 transition-colors cursor-pointer"
+              title="Delete selected opportunities"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Delete ({selectedOppIds.length})
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Main Table Logbook Card */}
       <div className="bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-800 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="bg-cream-50/60 dark:bg-sepia-900 border-b border-cream-150 dark:border-sepia-800 text-sepia-400 font-bold uppercase tracking-wider font-mono">
+              <tr className="bg-cream-50/60 dark:bg-sepia-850 border-b border-cream-150 dark:border-sepia-800 text-sepia-500 dark:text-cream-300 font-bold uppercase tracking-wider font-mono">
+                <th className="p-4 w-10 text-center">
+                  <input
+                    type="checkbox"
+                    id="select-all-opps-checkbox"
+                    checked={isAllPageSelected}
+                    onChange={handleToggleSelectAll}
+                    className="w-4 h-4 rounded border-cream-300 dark:border-sepia-700 text-readflow-green focus:ring-readflow-green cursor-pointer accent-readflow-green"
+                    title="Select all on this page"
+                  />
+                </th>
                 <th className="p-4">Opportunity details</th>
                 <th className="p-4">Category</th>
                 <th className="p-4">Score</th>
@@ -782,7 +1137,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
             <tbody className="divide-y divide-cream-100 dark:divide-sepia-800">
               {paginatedOpps.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="p-12 text-center text-sepia-400 italic">
+                  <td colSpan={9} className="p-12 text-center text-sepia-400 italic">
                     <HelpCircle className="w-8 h-8 mx-auto text-cream-300 dark:text-sepia-800 mb-2" />
                     No logged opportunities match the current filter selection. Keep creating!
                   </td>
@@ -797,6 +1152,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                   if (isEditing) {
                     return (
                       <tr key={opp.id} className="bg-cream-50/70 dark:bg-sepia-800/15 border-l-4 border-readflow-green">
+                        <td className="p-3 text-center text-sepia-400 font-mono text-[10px]">-</td>
                         {/* Title and details inputs */}
                         <td className="p-3 space-y-2">
                           <div>
@@ -1002,16 +1358,22 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
 
                         {/* Stage Dropdown */}
                         <td className="p-3">
-                          <select
-                            id={`page-edit-stage-${opp.id}`}
-                            value={editStage}
-                            onChange={(e) => setEditStage(e.target.value)}
-                            className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green cursor-pointer font-bold"
-                          >
-                            {STAGES.map((stg) => (
-                              <option key={stg} value={stg}>{stg}</option>
-                            ))}
-                          </select>
+                          {(() => {
+                            const catStages = getStagesForCategory(editCategory || opp.category);
+                            const stageOpts = catStages.includes(editStage) ? catStages : [editStage, ...catStages];
+                            return (
+                              <select
+                                id={`page-edit-stage-${opp.id}`}
+                                value={editStage}
+                                onChange={(e) => setEditStage(e.target.value)}
+                                className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green cursor-pointer font-bold"
+                              >
+                                {stageOpts.map((stg) => (
+                                  <option key={stg} value={stg}>{stg}</option>
+                                ))}
+                              </select>
+                            );
+                          })()}
                         </td>
 
                         {/* Feedback text area */}
@@ -1064,408 +1426,691 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                     );
                   }
 
-                  const oppStage = opp.stage || 'Sourced';
+                  const defaultStage = getPipelineTemplateForCategory(opp.category).stages[0];
+                  const oppStage = opp.stage || defaultStage;
+
+                  const eligibilityItems = opp.category === 'Scholarships'
+                    ? (opp.eligibilityChecklist && opp.eligibilityChecklist.length > 0
+                        ? opp.eligibilityChecklist
+                        : opp.eligibility
+                        ? textToChecklistItems(opp.eligibility)
+                        : [])
+                    : [];
+
+                  const requirementsItems = opp.category === 'Scholarships'
+                    ? (opp.requirementsChecklist && opp.requirementsChecklist.length > 0
+                        ? opp.requirementsChecklist
+                        : opp.requirements
+                        ? textToChecklistItems(opp.requirements)
+                        : [])
+                    : [];
+
+                  const hasScholarshipChecklists = opp.category === 'Scholarships' && (eligibilityItems.length > 0 || requirementsItems.length > 0);
+                  const hasDescription = Boolean(opp.description);
+                  const hasExpandedDetails = hasScholarshipChecklists || hasDescription;
+
+                  const activities = opp.activityLog && opp.activityLog.length > 0
+                    ? opp.activityLog
+                    : [
+                        {
+                          id: `init-${opp.id}`,
+                          timestamp: opp.timestamp,
+                          type: 'created' as const,
+                          title: 'Opportunity Logged',
+                          details: `Initial entry recorded under ${opp.category}`,
+                        },
+                      ];
+
+                  const isRowExpanded = expandedRows[opp.id] ?? hasExpandedDetails;
+                  const currentTab = activeTabMap[opp.id] || (hasExpandedDetails ? 'details' : 'timeline');
 
                   return (
-                    <tr
-                      key={opp.id}
-                      className="hover:bg-cream-50/45 dark:hover:bg-sepia-800/10 transition-colors"
-                    >
-                      {/* Details Column */}
-                      <td className="p-4 align-top">
-                        <div className="font-bold text-sepia-850 dark:text-cream-50 text-sm leading-snug">
-                          {opp.title}
-                        </div>
-                        <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] text-sepia-450 dark:text-sepia-500 font-medium font-sans">
-                          <span className="font-mono bg-cream-100 dark:bg-sepia-850 px-1.5 py-0.5 rounded text-sepia-700 dark:text-cream-200 border border-cream-200/50 dark:border-sepia-800">
-                            {opp.type || 'generic'}
-                          </span>
-                          <span>•</span>
-                          <span className="font-mono">{new Date(opp.timestamp).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
-                          {opp.linkedVisionId && (
-                            <>
-                              <span>•</span>
-                              <span className="text-readflow-green dark:text-readflow-lightgreen font-bold flex items-center gap-1 font-sans">
-                                <TrendingUp className="w-3 h-3 text-readflow-green/80" />
-                                Goal: {visions.find((v) => v.id === opp.linkedVisionId)?.title || 'Linked Goal'}
-                              </span>
-                            </>
+                    <React.Fragment key={opp.id}>
+                      <tr
+                        className={`hover:bg-cream-50/45 dark:hover:bg-sepia-800/10 transition-colors ${
+                          isRowExpanded ? 'border-b-0' : ''
+                        } ${selectedOppIds.includes(opp.id) ? 'bg-readflow-green/10 dark:bg-readflow-green/15' : ''}`}
+                      >
+                        {/* Checkbox column */}
+                        <td className="p-4 align-top text-center w-10">
+                          <input
+                            type="checkbox"
+                            id={`select-opp-${opp.id}`}
+                            checked={selectedOppIds.includes(opp.id)}
+                            onChange={() => handleToggleSelectOne(opp.id)}
+                            className="w-4 h-4 rounded border-cream-300 dark:border-sepia-700 text-readflow-green focus:ring-readflow-green cursor-pointer accent-readflow-green"
+                          />
+                        </td>
+
+                        {/* Details Column */}
+                        <td className="p-4 align-top">
+                          <div className="font-bold text-sepia-850 dark:text-cream-50 text-sm leading-snug">
+                            {opp.title}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] text-sepia-450 dark:text-sepia-500 font-medium font-sans">
+                            <span className="font-mono bg-cream-100 dark:bg-sepia-850 px-1.5 py-0.5 rounded text-sepia-700 dark:text-cream-200 border border-cream-200/50 dark:border-sepia-800">
+                              {opp.type || 'generic'}
+                            </span>
+                            <span>•</span>
+                            <span className="font-mono">{new Date(opp.timestamp).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                            {opp.linkedVisionId && (
+                              <>
+                                <span>•</span>
+                                <span className="text-readflow-green dark:text-readflow-lightgreen font-bold flex items-center gap-1 font-sans">
+                                  <TrendingUp className="w-3 h-3 text-readflow-green/80" />
+                                  Goal: {visions.find((v) => v.id === opp.linkedVisionId)?.title || 'Linked Goal'}
+                                </span>
+                              </>
+                            )}
+                          </div>
+
+                          {opp.companyOrClient && (
+                            <div className="mt-1.5 text-xs text-amber-900 dark:text-amber-300 font-semibold flex items-center gap-1.5 font-sans">
+                              <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                              <span>{opp.companyOrClient}</span>
+                            </div>
                           )}
-                        </div>
 
-                        {opp.companyOrClient && (
-                          <div className="mt-1.5 text-xs text-amber-900 dark:text-amber-300 font-semibold flex items-center gap-1.5 font-sans">
-                            <Building className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
-                            <span>{opp.companyOrClient}</span>
-                          </div>
-                        )}
+                          {opp.expectedValue && (
+                            <div className="mt-1 text-xs text-emerald-800 dark:text-emerald-300 font-semibold flex items-center gap-1.5 font-sans">
+                              <Coins className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                              <span>{opp.expectedValue}</span>
+                            </div>
+                          )}
 
-                        {opp.expectedValue && (
-                          <div className="mt-1 text-xs text-emerald-800 dark:text-emerald-300 font-semibold flex items-center gap-1.5 font-sans">
-                            <Coins className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                            <span>{opp.expectedValue}</span>
-                          </div>
-                        )}
+                          {/* Opportunity Tags & Inline Quick-Add */}
+                          <div className="flex flex-wrap items-center gap-1 mt-2">
+                            {(opp.tags || []).map((t) => (
+                              <span
+                                key={t}
+                                className="inline-flex items-center gap-0.5 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-cream-150 dark:bg-sepia-800 text-sepia-750 dark:text-cream-200 border border-cream-200 dark:border-sepia-700"
+                              >
+                                {t}
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRemoveTagFromOpp(opp, t);
+                                  }}
+                                  className="text-sepia-400 hover:text-rose-500 ml-0.5 cursor-pointer font-bold leading-none"
+                                  title={`Remove tag ${t}`}
+                                >
+                                  ×
+                                </button>
+                              </span>
+                            ))}
 
-                        {/* Opportunity Tags & Inline Quick-Add */}
-                        <div className="flex flex-wrap items-center gap-1 mt-2">
-                          {(opp.tags || []).map((t) => (
-                            <span
-                              key={t}
-                              className="inline-flex items-center gap-0.5 text-[9px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-cream-150 dark:bg-sepia-800 text-sepia-750 dark:text-cream-200 border border-cream-200 dark:border-sepia-700"
-                            >
-                              {t}
+                            {activeAddTagOppId === opp.id ? (
+                              <form
+                                onSubmit={(e) => {
+                                  e.preventDefault();
+                                  handleAddTagToOpp(opp, inlineTagInput);
+                                }}
+                                className="inline-flex items-center gap-0.5"
+                              >
+                                <input
+                                  type="text"
+                                  value={inlineTagInput}
+                                  onChange={(e) => setInlineTagInput(e.target.value)}
+                                  placeholder="#tag"
+                                  autoFocus
+                                  onBlur={() => {
+                                    if (!inlineTagInput.trim()) setActiveAddTagOppId(null);
+                                  }}
+                                  className="w-16 px-1.5 py-0.5 text-[9px] font-mono rounded border border-readflow-green bg-white dark:bg-sepia-900 text-sepia-800 dark:text-cream-100 focus:outline-none"
+                                />
+                                <button
+                                  type="submit"
+                                  className="px-1 py-0.5 text-[9px] font-bold bg-readflow-green text-cream-50 rounded"
+                                >
+                                  ✓
+                                </button>
+                              </form>
+                            ) : (
                               <button
                                 type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleRemoveTagFromOpp(opp, t);
+                                onClick={() => {
+                                  setActiveAddTagOppId(opp.id);
+                                  setInlineTagInput('');
                                 }}
-                                className="text-sepia-400 hover:text-rose-500 ml-0.5 cursor-pointer font-bold leading-none"
-                                title={`Remove tag ${t}`}
+                                className="text-[9px] font-mono text-sepia-400 hover:text-readflow-green dark:hover:text-readflow-lightgreen px-1.5 py-0.5 rounded border border-dashed border-cream-250 dark:border-sepia-750 cursor-pointer flex items-center gap-0.5"
+                                title="Add tag to opportunity"
                               >
-                                ×
+                                <Plus className="w-2.5 h-2.5" /> tag
                               </button>
-                            </span>
-                          ))}
+                            )}
+                          </div>
 
-                          {activeAddTagOppId === opp.id ? (
-                            <form
-                              onSubmit={(e) => {
-                                e.preventDefault();
-                                handleAddTagToOpp(opp, inlineTagInput);
-                              }}
-                              className="inline-flex items-center gap-0.5"
-                            >
-                              <input
-                                type="text"
-                                value={inlineTagInput}
-                                onChange={(e) => setInlineTagInput(e.target.value)}
-                                placeholder="#tag"
-                                autoFocus
-                                onBlur={() => {
-                                  if (!inlineTagInput.trim()) setActiveAddTagOppId(null);
-                                }}
-                                className="w-16 px-1.5 py-0.5 text-[9px] font-mono rounded border border-readflow-green bg-white dark:bg-sepia-900 text-sepia-800 dark:text-cream-100 focus:outline-none"
-                              />
-                              <button
-                                type="submit"
-                                className="px-1 py-0.5 text-[9px] font-bold bg-readflow-green text-cream-50 rounded"
-                              >
-                                ✓
-                              </button>
-                            </form>
-                          ) : (
+                          {/* SCHOLARSHIP SECTION: Deadline & Calendar Links */}
+                          {opp.category === 'Scholarships' && opp.deadline && (() => {
+                            const countdown = getDeadlineCountdown(opp.deadline);
+                            const gCalUrl = getGoogleCalendarUrl(opp, opp.deadline);
+                            return (
+                              <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${
+                                  countdown.past
+                                    ? 'bg-stone-100 dark:bg-stone-900 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-800'
+                                    : countdown.urgent
+                                    ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700 animate-pulse'
+                                    : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
+                                }`}>
+                                  <Calendar className="w-3.5 h-3.5 text-readflow-gold shrink-0" />
+                                  <span>Deadline: <strong className="font-mono">{opp.deadline}</strong></span>
+                                  <span className="text-[10px] font-mono font-bold opacity-80">({countdown.text})</span>
+                                </div>
+
+                                {/* Google Calendar and iCal buttons */}
+                                <div className="inline-flex items-center gap-1">
+                                  <a
+                                    href={gCalUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="px-2 py-0.5 rounded bg-cream-100 dark:bg-sepia-800 hover:bg-cream-200 dark:hover:bg-sepia-750 text-sepia-700 dark:text-cream-200 text-[10px] font-mono font-bold inline-flex items-center gap-1 border border-cream-200 dark:border-sepia-700"
+                                    title="Add deadline to Google Calendar"
+                                  >
+                                    <ExternalLink className="w-2.5 h-2.5 text-readflow-gold" />
+                                    Google Cal
+                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => downloadICalEvent(opp, opp.deadline!)}
+                                    className="px-2 py-0.5 rounded bg-cream-100 dark:bg-sepia-800 hover:bg-cream-200 dark:hover:bg-sepia-750 text-sepia-700 dark:text-cream-200 text-[10px] font-mono font-bold inline-flex items-center gap-1 border border-cream-200 dark:border-sepia-700 cursor-pointer"
+                                    title="Download iCal event (.ics)"
+                                  >
+                                    <Download className="w-2.5 h-2.5 text-readflow-green" />
+                                    iCal
+                                  </button>
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Quick Expansion Toggles: Timeline & Details */}
+                          <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
                             <button
                               type="button"
-                              onClick={() => {
-                                setActiveAddTagOppId(opp.id);
-                                setInlineTagInput('');
-                              }}
-                              className="text-[9px] font-mono text-sepia-400 hover:text-readflow-green dark:hover:text-readflow-lightgreen px-1.5 py-0.5 rounded border border-dashed border-cream-250 dark:border-sepia-750 cursor-pointer flex items-center gap-0.5"
-                              title="Add tag to opportunity"
+                              onClick={() => handleToggleRowExpand(opp.id, 'timeline')}
+                              className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                                isRowExpanded && currentTab === 'timeline'
+                                  ? 'bg-readflow-green text-cream-50 border-readflow-green shadow-xs'
+                                  : 'bg-cream-100/90 hover:bg-cream-200 dark:bg-sepia-800 dark:hover:bg-sepia-750 text-sepia-700 dark:text-cream-200 border-cream-200/90 dark:border-sepia-700'
+                              }`}
+                              title="View activity timeline, stage history, and add notes"
                             >
-                              <Plus className="w-2.5 h-2.5" /> tag
+                              <History className="w-3 h-3 text-readflow-green dark:text-readflow-lightgreen" />
+                              <span>Timeline ({activities.length})</span>
+                              {isRowExpanded && currentTab === 'timeline' ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5 opacity-60" />}
                             </button>
-                          )}
-                        </div>
-
-                        {/* SCHOLARSHIP SECTION: Eligibility Checklist, Requirements Checklist & Deadline */}
-                        {opp.category === 'Scholarships' && (() => {
-                          const eligibilityItems = opp.eligibilityChecklist && opp.eligibilityChecklist.length > 0
-                            ? opp.eligibilityChecklist
-                            : opp.eligibility
-                            ? textToChecklistItems(opp.eligibility)
-                            : [];
-                          const requirementsItems = opp.requirementsChecklist && opp.requirementsChecklist.length > 0
-                            ? opp.requirementsChecklist
-                            : opp.requirements
-                            ? textToChecklistItems(opp.requirements)
-                            : [];
-
-                          return (
-                            <div className="mt-3 space-y-2.5">
-                              {opp.deadline && (() => {
-                                const countdown = getDeadlineCountdown(opp.deadline);
-                                const gCalUrl = getGoogleCalendarUrl(opp, opp.deadline);
-                                return (
-                                  <div className="flex flex-wrap items-center gap-2">
-                                    <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold border ${
-                                      countdown.past
-                                        ? 'bg-stone-100 dark:bg-stone-900 text-stone-600 dark:text-stone-400 border-stone-200 dark:border-stone-800'
-                                        : countdown.urgent
-                                        ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border-amber-300 dark:border-amber-700 animate-pulse'
-                                        : 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800'
-                                    }`}>
-                                      <Calendar className="w-3.5 h-3.5 text-readflow-gold shrink-0" />
-                                      <span>Deadline: <strong className="font-mono">{opp.deadline}</strong></span>
-                                      <span className="text-[10px] font-mono font-bold opacity-80">({countdown.text})</span>
-                                    </div>
-
-                                    {/* Google Calendar and iCal buttons */}
-                                    <div className="inline-flex items-center gap-1">
-                                      <a
-                                        href={gCalUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="px-2 py-0.5 rounded bg-cream-100 dark:bg-sepia-800 hover:bg-cream-200 dark:hover:bg-sepia-750 text-sepia-700 dark:text-cream-200 text-[10px] font-mono font-bold inline-flex items-center gap-1 border border-cream-200 dark:border-sepia-700"
-                                        title="Add deadline to Google Calendar"
-                                      >
-                                        <ExternalLink className="w-2.5 h-2.5 text-readflow-gold" />
-                                        Google Cal
-                                      </a>
-                                      <button
-                                        type="button"
-                                        onClick={() => downloadICalEvent(opp, opp.deadline!)}
-                                        className="px-2 py-0.5 rounded bg-cream-100 dark:bg-sepia-800 hover:bg-cream-200 dark:hover:bg-sepia-750 text-sepia-700 dark:text-cream-200 text-[10px] font-mono font-bold inline-flex items-center gap-1 border border-cream-200 dark:border-sepia-700 cursor-pointer"
-                                        title="Download iCal event (.ics)"
-                                      >
-                                        <Download className="w-2.5 h-2.5 text-readflow-green" />
-                                        iCal
-                                      </button>
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-
-                              {/* Interactive Eligibility Checklist */}
-                              <div className="p-2.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-150 dark:border-blue-900/40">
-                                <div className="flex items-center justify-between gap-2 mb-1.5">
-                                  <div className="text-[11px] font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
-                                    <CheckSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                                    <span>Eligibility Criteria Checklist</span>
-                                  </div>
-                                  <span className="text-[10px] font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">
-                                    {eligibilityItems.filter((i) => i.completed).length}/{eligibilityItems.length} Met
-                                  </span>
-                                </div>
-                                {eligibilityItems.length === 0 ? (
-                                  <p className="text-[10px] text-sepia-400 italic">No eligibility criteria logged yet.</p>
-                                ) : (
-                                  <div className="space-y-1">
-                                    {eligibilityItems.map((item) => (
-                                      <label
-                                        key={item.id}
-                                        className="flex items-start gap-2 p-1 rounded hover:bg-white/60 dark:hover:bg-sepia-900/40 transition-colors cursor-pointer text-xs"
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={item.completed}
-                                          onChange={() => handleToggleEligibilityItem(opp, item.id)}
-                                          className="mt-0.5 accent-blue-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
-                                        />
-                                        <span className={item.completed ? 'line-through text-sepia-400 dark:text-sepia-500 font-normal' : 'text-sepia-800 dark:text-cream-100 font-medium'}>
-                                          {item.text}
-                                        </span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-
-                              {/* Interactive Requirements Checklist */}
-                              <div className="p-2.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-150 dark:border-indigo-900/40">
-                                <div className="flex items-center justify-between gap-2 mb-1.5">
-                                  <div className="text-[11px] font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
-                                    <ListChecks className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-                                    <span>Application Requirements Checklist</span>
-                                  </div>
-                                  <span className="text-[10px] font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-1.5 py-0.5 rounded">
-                                    {requirementsItems.filter((i) => i.completed).length}/{requirementsItems.length} Ready
-                                  </span>
-                                </div>
-                                {requirementsItems.length === 0 ? (
-                                  <p className="text-[10px] text-sepia-400 italic">No requirements logged yet.</p>
-                                ) : (
-                                  <div className="space-y-1">
-                                    {requirementsItems.map((item) => (
-                                      <label
-                                        key={item.id}
-                                        className="flex items-start gap-2 p-1 rounded hover:bg-white/60 dark:hover:bg-sepia-900/40 transition-colors cursor-pointer text-xs"
-                                      >
-                                        <input
-                                          type="checkbox"
-                                          checked={item.completed}
-                                          onChange={() => handleToggleRequirementItem(opp, item.id)}
-                                          className="mt-0.5 accent-indigo-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
-                                        />
-                                        <span className={item.completed ? 'line-through text-sepia-400 dark:text-sepia-500 font-normal' : 'text-sepia-800 dark:text-cream-100 font-medium'}>
-                                          {item.text}
-                                        </span>
-                                      </label>
-                                    ))}
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          );
-                        })()}
-
-                        {opp.description && (
-                          <div className="mt-2.5 text-xs text-sepia-700 dark:text-sepia-300 bg-cream-50/70 dark:bg-sepia-850/60 p-2.5 rounded-xl border border-cream-200/70 dark:border-sepia-800 font-sans leading-relaxed">
-                            <span className="font-bold block mb-1 text-[10px] uppercase font-mono tracking-wider text-sepia-450 dark:text-sepia-400">
-                              {opp.category === 'Scholarships' ? 'Additional Notes & Essay Prompts:' : opp.category === 'Farming' ? 'Field & Crop Notes:' : opp.category === 'Health' ? 'Workout & Health Log:' : opp.category === 'Learning' ? 'Key Takeaways & Reflections:' : 'Details & Scope:'}
-                            </span>
-                            <FormattedText text={opp.description} />
-                          </div>
-                        )}
-                      </td>
-
-                      {/* Category Badge */}
-                      <td className="p-4 align-top">
-                        <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${meta.bg} ${meta.border} ${meta.color}`}>
-                          <Icon className="w-3 h-3" />
-                          {opp.category}
-                        </div>
-                      </td>
-
-                      {/* Points score */}
-                      <td className="p-4 align-top">
-                        <div className="font-mono font-extrabold text-readflow-green dark:text-readflow-lightgreen text-sm">
-                          +{opp.points}
-                        </div>
-                      </td>
-
-                      {/* Custom Interactive Stage dropdown */}
-                      <td className="p-4 align-top">
-                        <select
-                          id={`quick-stage-select-${opp.id}`}
-                          value={oppStage}
-                          onChange={(e) => handleQuickStageSave(opp, e.target.value)}
-                          className={`w-full text-[10px] font-bold px-2 py-1 rounded border cursor-pointer focus:outline-none ${
-                            oppStage.includes('Won')
-                              ? 'bg-readflow-green/10 dark:bg-readflow-olive/15 text-readflow-green border-readflow-green/20'
-                              : oppStage.includes('Lost')
-                              ? 'bg-red-50 dark:bg-red-950/20 text-red-500 border-red-200 dark:border-red-950/40'
-                              : oppStage === 'Active'
-                              ? 'bg-readflow-gold/15 text-readflow-olive dark:text-readflow-gold border-readflow-gold/30'
-                              : 'bg-cream-50 dark:bg-sepia-850 text-sepia-700 dark:text-cream-200 border-cream-200 dark:border-sepia-800'
-                          }`}
-                        >
-                          {STAGES.map((stg) => (
-                            <option key={stg} value={stg}>{stg}</option>
-                          ))}
-                        </select>
-                      </td>
-
-                      {/* Direct Editable Qualitative Feedback Column */}
-                      <td className="p-4 align-top">
-                        <div className="relative group/feedback">
-                          <textarea
-                            id={`quick-feedback-input-${opp.id}`}
-                            defaultValue={opp.feedback || ''}
-                            placeholder="Click to add feedback/notes..."
-                            onBlur={(e) => handleQuickFeedbackSave(opp, e.target.value)}
-                            rows={opp.feedback && opp.feedback.length > 50 ? 3 : 2}
-                            className="w-full bg-cream-50/40 hover:bg-white focus:bg-white dark:bg-sepia-850/30 dark:hover:bg-sepia-900 dark:focus:bg-sepia-900 border border-cream-200 dark:border-sepia-800 focus:border-readflow-green/60 rounded-xl p-2 text-xs text-sepia-800 dark:text-cream-100 transition-all font-sans resize-y focus:outline-none"
-                          />
-                        </div>
-                      </td>
-
-                      {/* Upload Files Attachment Column */}
-                      <td className="p-4">
-                        {opp.fileName ? (
-                          <div className="flex items-center justify-between gap-1 bg-cream-50/50 dark:bg-sepia-850/40 px-2 py-1.5 rounded-lg border border-cream-150 dark:border-sepia-800/50">
-                            <span
-                              onClick={() => triggerDownload(opp)}
-                              className="text-[10px] text-sepia-800 dark:text-cream-200 font-bold truncate max-w-[100px] hover:underline cursor-pointer flex items-center gap-1"
-                              title="Download attachment"
-                            >
-                              <FileText className="w-3 h-3 text-readflow-green shrink-0" />
-                              {opp.fileName}
-                            </span>
-                            <div className="flex shrink-0 items-center gap-0.5">
+                            {(hasScholarshipChecklists || hasDescription) && (
                               <button
-                                id={`file-dl-${opp.id}`}
-                                onClick={() => triggerDownload(opp)}
-                                className="p-1 rounded text-sepia-450 hover:text-readflow-green hover:bg-cream-100 dark:hover:bg-sepia-800 cursor-pointer"
-                                title="Download"
+                                type="button"
+                                onClick={() => handleToggleRowExpand(opp.id, 'details')}
+                                className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                                  isRowExpanded && currentTab === 'details'
+                                    ? 'bg-readflow-green text-cream-50 border-readflow-green shadow-xs'
+                                    : 'bg-cream-100/90 hover:bg-cream-200 dark:bg-sepia-800 dark:hover:bg-sepia-750 text-sepia-700 dark:text-cream-200 border-cream-200/90 dark:border-sepia-700'
+                                }`}
+                                title="View full description, criteria, and checklists"
                               >
-                                <Download className="w-3 h-3" />
+                                <FileText className="w-3 h-3" />
+                                <span>Details</span>
+                                {isRowExpanded && currentTab === 'details' ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5 opacity-60" />}
                               </button>
-                              <button
-                                id={`file-remove-${opp.id}`}
-                                onClick={() => handleRemoveFile(opp)}
-                                className="p-1 rounded text-sepia-450 hover:text-red-500 hover:bg-cream-100 dark:hover:bg-sepia-800 cursor-pointer"
-                                title="Remove file"
-                              >
-                                <X className="w-3 h-3" />
-                              </button>
-                            </div>
+                            )}
                           </div>
-                        ) : (
-                          <div
-                            onDragOver={(e) => handleDragOver(e, opp.id)}
-                            onDragLeave={handleDragLeave}
-                            onDrop={(e) => handleDrop(e, opp)}
-                            className={`border border-dashed rounded-lg p-2 text-center transition-all ${
-                              dragActiveId === opp.id
-                                ? 'border-readflow-green bg-cream-50/50 dark:bg-sepia-800/10 scale-95'
-                                : 'border-cream-200 dark:border-sepia-800 hover:border-readflow-green/60'
-                            }`}
-                          >
-                            <input
-                              id={`file-input-${opp.id}`}
-                              ref={(el) => (fileInputRefs.current[opp.id] = el)}
-                              type="file"
-                              onChange={(e) => handleFileChange(opp, e)}
-                              className="hidden"
-                              accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
+                        </td>
+
+                        {/* Category Badge */}
+                        <td className="p-4 align-top">
+                          <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold ${meta.bg} ${meta.border} ${meta.color}`}>
+                            <Icon className="w-3 h-3" />
+                            {opp.category}
+                          </div>
+                        </td>
+
+                        {/* Points score */}
+                        <td className="p-4 align-top">
+                          <div className="font-mono font-extrabold text-readflow-green dark:text-readflow-lightgreen text-sm">
+                            +{opp.points}
+                          </div>
+                        </td>
+
+                        {/* Custom Interactive Stage dropdown */}
+                        <td className="p-4 align-top">
+                          {(() => {
+                            const catStages = getStagesForCategory(opp.category);
+                            const stageOpts = catStages.includes(oppStage) ? catStages : [oppStage, ...catStages];
+                            const badgeStyle = getStageBadgeStyle(oppStage);
+                            return (
+                              <select
+                                id={`quick-stage-select-${opp.id}`}
+                                value={oppStage}
+                                onChange={(e) => handleQuickStageSave(opp, e.target.value)}
+                                className={`w-full text-[10px] font-bold px-2 py-1 rounded border cursor-pointer focus:outline-none transition-colors ${badgeStyle.bg} ${badgeStyle.text} ${badgeStyle.border}`}
+                              >
+                                {stageOpts.map((stg) => (
+                                  <option key={stg} value={stg} className="bg-white dark:bg-sepia-900 text-sepia-800 dark:text-cream-100">
+                                    {stg}
+                                  </option>
+                                ))}
+                              </select>
+                            );
+                          })()}
+                        </td>
+
+                        {/* Direct Editable Qualitative Feedback Column */}
+                        <td className="p-4 align-top">
+                          <div className="relative group/feedback">
+                            <textarea
+                              id={`quick-feedback-input-${opp.id}`}
+                              defaultValue={opp.feedback || ''}
+                              placeholder="Click to add feedback/notes..."
+                              onBlur={(e) => handleQuickFeedbackSave(opp, e.target.value)}
+                              rows={opp.feedback && opp.feedback.length > 50 ? 3 : 2}
+                              className="w-full bg-cream-50/40 hover:bg-white focus:bg-white dark:bg-sepia-850/30 dark:hover:bg-sepia-900 dark:focus:bg-sepia-900 border border-cream-200 dark:border-sepia-800 focus:border-readflow-green/60 rounded-xl p-2 text-xs text-sepia-800 dark:text-cream-100 transition-all font-sans resize-y focus:outline-none"
                             />
-                            <button
-                              id={`trigger-upload-${opp.id}`}
-                              onClick={() => fileInputRefs.current[opp.id]?.click()}
-                              className="text-[10px] text-sepia-450 hover:text-readflow-green font-bold flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                          </div>
+                        </td>
+
+                        {/* Upload Files Attachment Column */}
+                        <td className="p-4 align-top">
+                          {opp.fileName ? (
+                            <div className="flex items-center justify-between gap-1 bg-cream-50/50 dark:bg-sepia-850/40 px-2 py-1.5 rounded-lg border border-cream-150 dark:border-sepia-800/50">
+                              <span
+                                onClick={() => triggerDownload(opp)}
+                                className="text-[10px] text-sepia-800 dark:text-cream-200 font-bold truncate max-w-[100px] hover:underline cursor-pointer flex items-center gap-1"
+                                title="Download attachment"
+                              >
+                                <FileText className="w-3 h-3 text-readflow-green shrink-0" />
+                                {opp.fileName}
+                              </span>
+                              <div className="flex shrink-0 items-center gap-0.5">
+                                <button
+                                  id={`file-dl-${opp.id}`}
+                                  onClick={() => triggerDownload(opp)}
+                                  className="p-1 rounded text-sepia-450 hover:text-readflow-green hover:bg-cream-100 dark:hover:bg-sepia-800 cursor-pointer"
+                                  title="Download"
+                                >
+                                  <Download className="w-3 h-3" />
+                                </button>
+                                <button
+                                  id={`file-remove-${opp.id}`}
+                                  onClick={() => handleRemoveFile(opp)}
+                                  className="p-1 rounded text-sepia-450 hover:text-red-500 hover:bg-cream-100 dark:hover:bg-sepia-800 cursor-pointer"
+                                  title="Remove file"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              onDragOver={(e) => handleDragOver(e, opp.id)}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, opp)}
+                              className={`border border-dashed rounded-lg p-2 text-center transition-all ${
+                                dragActiveId === opp.id
+                                  ? 'border-readflow-green bg-cream-50/50 dark:bg-sepia-800/10 scale-95'
+                                  : 'border-cream-200 dark:border-sepia-800 hover:border-readflow-green/60'
+                              }`}
                             >
-                              <FileUp className="w-3.5 h-3.5" />
-                              Attach File
+                              <input
+                                id={`file-input-${opp.id}`}
+                                ref={(el) => (fileInputRefs.current[opp.id] = el)}
+                                type="file"
+                                onChange={(e) => handleFileChange(opp, e)}
+                                className="hidden"
+                                accept=".pdf,.doc,.docx,.png,.jpg,.jpeg,.txt"
+                              />
+                              <button
+                                id={`trigger-upload-${opp.id}`}
+                                onClick={() => fileInputRefs.current[opp.id]?.click()}
+                                className="text-[10px] text-sepia-450 hover:text-readflow-green font-bold flex items-center justify-center gap-1 mx-auto cursor-pointer"
+                              >
+                                <FileUp className="w-3.5 h-3.5" />
+                                Attach File
+                              </button>
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Connect / Open in Pipeline Column */}
+                        <td className="p-4 align-top text-center">
+                          {opp.pipelineId ? (
+                            <div className="flex flex-col items-center gap-1.5">
+                              <button
+                                id={`pipeline-action-${opp.id}`}
+                                onClick={() => handlePipelineAction(opp)}
+                                className="inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold bg-readflow-green text-cream-50 hover:bg-readflow-olive shadow-sm transition-all cursor-pointer w-full whitespace-nowrap"
+                              >
+                                <GitBranch className="w-3.5 h-3.5" />
+                                Open Pipeline ↗
+                              </button>
+                              <button
+                                type="button"
+                                id={`unlink-pipeline-${opp.id}`}
+                                onClick={() => handleUnlinkPipeline(opp)}
+                                className="text-[9px] text-sepia-400 hover:text-red-500 hover:underline flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                                title="Unlink from pipeline"
+                              >
+                                <Unlink className="w-2.5 h-2.5" />
+                                Unlink
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center gap-1.5">
+                              <button
+                                id={`pipeline-action-${opp.id}`}
+                                onClick={() => handlePipelineAction(opp)}
+                                className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg text-[10px] font-bold border border-cream-200 dark:border-sepia-800 text-sepia-650 dark:text-cream-250 hover:bg-cream-50 dark:hover:bg-sepia-850 transition-all cursor-pointer w-full whitespace-nowrap"
+                              >
+                                <GitBranch className="w-3.5 h-3.5" />
+                                Start Lifecycle
+                              </button>
+                              {unlinkedPipelines.length > 0 && (
+                                <div className="w-full">
+                                  <select
+                                    id={`link-pipeline-select-${opp.id}`}
+                                    defaultValue=""
+                                    onChange={(e) => {
+                                      if (e.target.value) {
+                                        handleLinkExistingPipeline(opp, e.target.value);
+                                        e.target.value = '';
+                                      }
+                                    }}
+                                    className="w-full text-[9px] font-bold px-1.5 py-1 bg-cream-50 dark:bg-sepia-850 border border-cream-200 dark:border-sepia-800 rounded text-sepia-600 dark:text-cream-300 cursor-pointer truncate hover:border-readflow-green transition-colors"
+                                    title="Link this opportunity to an existing pipeline"
+                                  >
+                                    <option value="" disabled>Link existing...</option>
+                                    {unlinkedPipelines.map((p) => (
+                                      <option key={p.id} value={p.id}>
+                                        🔗 {p.title}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </td>
+
+                        {/* Action controls */}
+                        <td className="p-4 align-top">
+                          <div className="flex items-center justify-center gap-2">
+                            <button
+                              id={`edit-btn-${opp.id}`}
+                              onClick={() => startEditing(opp)}
+                              className="text-sepia-400 hover:text-readflow-green p-1.5 rounded-lg hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all cursor-pointer"
+                              title="Edit details"
+                            >
+                              <Edit2 className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              id={`del-btn-${opp.id}`}
+                              onClick={() => {
+                                if (confirm('Are you sure you want to permanently delete this opportunity? This cannot be undone.')) {
+                                  onDeleteOpportunity(opp.id);
+                                }
+                              }}
+                              className="text-sepia-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all cursor-pointer"
+                              title="Delete permanently"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                        )}
-                      </td>
+                        </td>
+                      </tr>
 
-                      {/* Connect / Open in Pipeline Column */}
-                      <td className="p-4 text-center">
-                        <button
-                          id={`pipeline-action-${opp.id}`}
-                          onClick={() => handlePipelineAction(opp)}
-                          className={`inline-flex items-center justify-center gap-1 px-3 py-1.5 rounded-lg text-[10px] font-bold transition-all cursor-pointer ${
-                            opp.pipelineId
-                              ? 'bg-readflow-green text-cream-50 hover:bg-readflow-olive shadow-sm'
-                              : 'border border-cream-200 dark:border-sepia-800 text-sepia-650 dark:text-cream-250 hover:bg-cream-50 dark:hover:bg-sepia-850'
-                          }`}
+                      {/* Full-width Expanded Drawer (Details / Activity Timeline) */}
+                      {isRowExpanded && (
+                        <tr
+                          key={`${opp.id}-expanded-drawer`}
+                          className="hover:bg-cream-50/35 dark:hover:bg-sepia-800/10 transition-colors border-b border-cream-150/70 dark:border-sepia-800/70 !border-t-0"
                         >
-                          <GitBranch className="w-3.5 h-3.5" />
-                          {opp.pipelineId ? 'Open Pipeline ↗' : 'Start Lifecycle'}
-                        </button>
-                      </td>
+                          <td colSpan={9} className="px-4 pb-4 pt-1">
+                            <div className="space-y-3">
+                              {/* Tab Switcher Header */}
+                              <div className="flex items-center justify-between border-b border-cream-200/70 dark:border-sepia-800/70 pb-2">
+                                <div className="flex items-center gap-1.5">
+                                  {hasExpandedDetails && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSelectRowTab(opp.id, 'details')}
+                                      className={`text-[11px] font-bold px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                                        currentTab === 'details'
+                                          ? 'bg-readflow-green text-cream-50 shadow-xs'
+                                          : 'text-sepia-650 dark:text-cream-300 hover:bg-cream-100 dark:hover:bg-sepia-800'
+                                      }`}
+                                    >
+                                      <FileText className="w-3.5 h-3.5" />
+                                      Details & Scope
+                                    </button>
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSelectRowTab(opp.id, 'timeline')}
+                                    className={`text-[11px] font-bold px-2.5 py-1 rounded-md transition-all cursor-pointer flex items-center gap-1.5 ${
+                                      currentTab === 'timeline'
+                                        ? 'bg-readflow-green text-cream-50 shadow-xs'
+                                        : 'text-sepia-650 dark:text-cream-300 hover:bg-cream-100 dark:hover:bg-sepia-800'
+                                    }`}
+                                  >
+                                    <History className="w-3.5 h-3.5" />
+                                    Activity Timeline & History
+                                    <span className={`text-[9px] font-mono px-1.5 py-0.2 rounded-full ${
+                                      currentTab === 'timeline'
+                                        ? 'bg-white/20 text-cream-50'
+                                        : 'bg-cream-200 dark:bg-sepia-800 text-sepia-800 dark:text-cream-200'
+                                    }`}>
+                                      {activities.length}
+                                    </span>
+                                  </button>
+                                </div>
 
-                      {/* Action controls */}
-                      <td className="p-4">
-                        <div className="flex items-center justify-center gap-2">
-                          <button
-                            id={`edit-btn-${opp.id}`}
-                            onClick={() => startEditing(opp)}
-                            className="text-sepia-400 hover:text-readflow-green p-1.5 rounded-lg hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all cursor-pointer"
-                            title="Edit details"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                          <button
-                            id={`del-btn-${opp.id}`}
-                            onClick={() => {
-                              if (confirm('Are you sure you want to permanently delete this opportunity? This cannot be undone.')) {
-                                onDeleteOpportunity(opp.id);
-                              }
-                            }}
-                            className="text-sepia-300 hover:text-red-500 p-1.5 rounded-lg hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all cursor-pointer"
-                            title="Delete permanently"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleRowExpand(opp.id)}
+                                  className="text-[10px] font-bold text-sepia-400 hover:text-sepia-700 dark:hover:text-cream-200 flex items-center gap-1 cursor-pointer transition-colors"
+                                >
+                                  <ChevronUp className="w-3 h-3" />
+                                  Collapse
+                                </button>
+                              </div>
+
+                              {/* TAB 1: DETAILS & SCOPE */}
+                              {currentTab === 'details' && hasExpandedDetails && (
+                                <div className="space-y-2.5 animate-fadeIn">
+                                  {/* If scholarship has checklists, show them side-by-side in responsive grid */}
+                                  {hasScholarshipChecklists && (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1">
+                                      {/* Interactive Eligibility Checklist */}
+                                      <div className="p-2.5 rounded-xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-150 dark:border-blue-900/40">
+                                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                                          <div className="text-[11px] font-bold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                                            <CheckSquare className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                                            <span>Eligibility Criteria Checklist</span>
+                                          </div>
+                                          <span className="text-[10px] font-mono font-bold text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/50 px-1.5 py-0.5 rounded">
+                                            {eligibilityItems.filter((i) => i.completed).length}/{eligibilityItems.length} Met
+                                          </span>
+                                        </div>
+                                        {eligibilityItems.length === 0 ? (
+                                          <p className="text-[10px] text-sepia-400 italic">No eligibility criteria logged yet.</p>
+                                        ) : (
+                                          <div className="space-y-1">
+                                            {eligibilityItems.map((item) => (
+                                              <label
+                                                key={item.id}
+                                                className="flex items-start gap-2 p-1 rounded hover:bg-white/60 dark:hover:bg-sepia-900/40 transition-colors cursor-pointer text-xs"
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={item.completed}
+                                                  onChange={() => handleToggleEligibilityItem(opp, item.id)}
+                                                  className="mt-0.5 accent-blue-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
+                                                />
+                                                <span className={item.completed ? 'line-through text-sepia-400 dark:text-sepia-500 font-normal' : 'text-sepia-800 dark:text-cream-100 font-medium'}>
+                                                  {item.text}
+                                                </span>
+                                              </label>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+
+                                      {/* Interactive Requirements Checklist */}
+                                      <div className="p-2.5 rounded-xl bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-150 dark:border-indigo-900/40">
+                                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                                          <div className="text-[11px] font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+                                            <ListChecks className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                                            <span>Application Requirements Checklist</span>
+                                          </div>
+                                          <span className="text-[10px] font-mono font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-100 dark:bg-indigo-900/50 px-1.5 py-0.5 rounded">
+                                            {requirementsItems.filter((i) => i.completed).length}/{requirementsItems.length} Ready
+                                          </span>
+                                        </div>
+                                        {requirementsItems.length === 0 ? (
+                                          <p className="text-[10px] text-sepia-400 italic">No requirements logged yet.</p>
+                                        ) : (
+                                          <div className="space-y-1">
+                                            {requirementsItems.map((item) => (
+                                              <label
+                                                key={item.id}
+                                                className="flex items-start gap-2 p-1 rounded hover:bg-white/60 dark:hover:bg-sepia-900/40 transition-colors cursor-pointer text-xs"
+                                              >
+                                                <input
+                                                  type="checkbox"
+                                                  checked={item.completed}
+                                                  onChange={() => handleToggleRequirementItem(opp, item.id)}
+                                                  className="mt-0.5 accent-indigo-600 rounded cursor-pointer w-3.5 h-3.5 shrink-0"
+                                                />
+                                                <span className={item.completed ? 'line-through text-sepia-400 dark:text-sepia-500 font-normal' : 'text-sepia-800 dark:text-cream-100 font-medium'}>
+                                                  {item.text}
+                                                </span>
+                                              </label>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Full-width Details & Scope card filling the space */}
+                                  {opp.description && (
+                                    <div className="w-full text-xs text-sepia-800 dark:text-cream-200 bg-cream-50/80 dark:bg-sepia-850 p-3 rounded-xl border border-cream-200/80 dark:border-sepia-750 font-sans leading-relaxed">
+                                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                                        <span className="font-bold text-[10px] uppercase font-mono tracking-wider text-sepia-500 dark:text-cream-300">
+                                          {opp.category === 'Scholarships' ? 'Additional Notes & Essay Prompts:' : opp.category === 'Farming' ? 'Field & Crop Notes:' : opp.category === 'Health' ? 'Workout & Health Log:' : opp.category === 'Learning' ? 'Key Takeaways & Reflections:' : 'Details & Scope:'}
+                                        </span>
+                                      </div>
+                                      <FormattedText text={opp.description} />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+
+                              {/* TAB 2: ACTIVITY TIMELINE & HISTORY */}
+                              {currentTab === 'timeline' && (
+                                <div className="space-y-3 animate-fadeIn">
+                                  {/* Quick Note Input Bar */}
+                                  <div className="bg-cream-50/70 dark:bg-sepia-850 p-2.5 rounded-xl border border-cream-200/70 dark:border-sepia-750 flex items-center gap-2">
+                                    <input
+                                      id={`note-input-${opp.id}`}
+                                      type="text"
+                                      placeholder="Log a call note, follow-up, interview feedback, or status update..."
+                                      value={quickNoteInputs[opp.id] || ''}
+                                      onChange={(e) => setQuickNoteInputs((prev) => ({ ...prev, [opp.id]: e.target.value }))}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          handleAddActivityNote(opp);
+                                        }
+                                      }}
+                                      className="flex-1 px-3 py-1.5 text-xs rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 text-sepia-850 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green"
+                                    />
+                                    <button
+                                      type="button"
+                                      id={`add-note-btn-${opp.id}`}
+                                      onClick={() => handleAddActivityNote(opp)}
+                                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-readflow-green text-cream-50 hover:bg-readflow-olive transition-colors cursor-pointer shrink-0 shadow-xs"
+                                    >
+                                      <Send className="w-3 h-3" />
+                                      Add Note
+                                    </button>
+                                  </div>
+
+                                  {/* Vertical Timeline */}
+                                  <div className="relative pl-6 py-1 space-y-3.5 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-cream-200 dark:before:bg-sepia-800">
+                                    {activities.map((act) => {
+                                      const isCreated = act.type === 'created';
+                                      const isStage = act.type === 'stage_change';
+                                      const isNote = act.type === 'note';
+                                      const isFile = act.type === 'file_attached';
+
+                                      const IconComponent = isCreated
+                                        ? Sparkles
+                                        : isStage
+                                        ? ArrowRight
+                                        : isNote
+                                        ? MessageSquare
+                                        : isFile
+                                        ? FileText
+                                        : GitBranch;
+
+                                      const iconColor = isCreated
+                                        ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                                        : isStage
+                                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300 border-blue-300 dark:border-blue-800'
+                                        : isNote
+                                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                                        : isFile
+                                        ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300 border-purple-300 dark:border-purple-800'
+                                        : 'bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-300 border-stone-300 dark:border-stone-700';
+
+                                      return (
+                                        <div key={act.id} className="relative group/timeline">
+                                          {/* Timeline Node Icon */}
+                                          <div className={`absolute -left-6 top-0.5 w-5 h-5 rounded-full flex items-center justify-center border text-[10px] shadow-xs ${iconColor}`}>
+                                            <IconComponent className="w-2.5 h-2.5" />
+                                          </div>
+
+                                          {/* Timeline Event Card */}
+                                          <div className="bg-white/80 dark:bg-sepia-900/80 p-2.5 rounded-lg border border-cream-200/80 dark:border-sepia-800 shadow-2xs">
+                                            <div className="flex items-center justify-between gap-2">
+                                              <span className="text-xs font-bold text-sepia-850 dark:text-cream-100 flex items-center gap-1.5">
+                                                {act.title}
+                                                {isStage && act.previousStage && act.newStage && (
+                                                  <span className="font-mono text-[10px] font-normal text-sepia-500 dark:text-cream-300">
+                                                    ({act.previousStage} → <strong className="text-readflow-green dark:text-readflow-lightgreen font-bold">{act.newStage}</strong>)
+                                                  </span>
+                                                )}
+                                              </span>
+                                              <span className="text-[10px] font-mono text-sepia-400 dark:text-sepia-500">
+                                                {new Date(act.timestamp).toLocaleString(undefined, {
+                                                  month: 'short',
+                                                  day: 'numeric',
+                                                  hour: '2-digit',
+                                                  minute: '2-digit',
+                                                })}
+                                              </span>
+                                            </div>
+                                            {act.details && (
+                                              <p className="mt-1 text-xs text-sepia-700 dark:text-cream-200 leading-relaxed font-sans">
+                                                {act.details}
+                                              </p>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               )}

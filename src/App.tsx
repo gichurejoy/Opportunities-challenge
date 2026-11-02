@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { localDb, AppState } from './utils/localDb';
-import { Opportunity, OpportunityPipeline, ScoreConfig, Vision, ChecklistHabit, NudgeConfig, isChecklistOpportunity } from './types';
+import { Opportunity, OpportunityPipeline, ScoreConfig, Vision, ChecklistHabit, NudgeConfig, isChecklistOpportunity, OpportunityActivity } from './types';
 import { QuickLogger } from './components/QuickLogger';
 import { Inspiration } from './components/Inspiration';
 import { Heatmap } from './components/Heatmap';
@@ -31,9 +31,13 @@ import { BadgesModal } from './components/BadgesModal';
 import { WeeklyReportModal } from './components/WeeklyReportModal';
 import { QuickTemplates } from './components/QuickTemplates';
 import { DeadlineTracker } from './components/DeadlineTracker';
+import { CommandPalette } from './components/CommandPalette';
+import { AIOpportunityModal } from './components/AIOpportunityModal';
+import { CSVImportModal } from './components/CSVImportModal';
+import { RoadmapModal } from './components/RoadmapModal';
 import { useNetworkStatus, pwaManager } from './utils/pwa';
 import { User, api, authStorage } from './utils/api';
-import { Sparkles, Trophy, Settings, Archive, Star, CheckCircle, Info, Sun, Moon, LayoutDashboard, ClipboardList, ListChecks, BellRing, Home, LogIn, LogOut, User as UserIcon, Cloud, Database, Printer, Award, HelpCircle, Wifi, WifiOff, RefreshCw, Smartphone } from 'lucide-react';
+import { Sparkles, Trophy, Settings, Archive, Star, CheckCircle, Info, Sun, Moon, LayoutDashboard, ClipboardList, ListChecks, BellRing, Home, LogIn, LogOut, User as UserIcon, Cloud, Database, Printer, Award, HelpCircle, Wifi, WifiOff, RefreshCw, Smartphone, Search, FileSpreadsheet, Wand2, MoreHorizontal } from 'lucide-react';
 
 
 export default function App() {
@@ -43,6 +47,13 @@ export default function App() {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState<boolean>(false);
   const [isBadgesOpen, setIsBadgesOpen] = useState<boolean>(false);
   const [isReportOpen, setIsReportOpen] = useState<boolean>(false);
+  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState<boolean>(false);
+  const [isAIOpen, setIsAIOpen] = useState<boolean>(false);
+  const [isCSVImportOpen, setIsCSVImportOpen] = useState<boolean>(false);
+  const [isRoadmapOpen, setIsRoadmapOpen] = useState<boolean>(false);
+  const [isToolsMenuOpen, setIsToolsMenuOpen] = useState<boolean>(false);
+  const toolsMenuRef = useRef<HTMLDivElement>(null);
+  const [selectedAIOpp, setSelectedAIOpp] = useState<Opportunity | null>(null);
   const [showLanding, setShowLanding] = useState<boolean>(true);
   const [currentView, setCurrentView] = useState<'dashboard' | 'logbook' | 'checklist' | 'vision-details' | 'privacy' | 'terms'>('dashboard');
   const [selectedVisionId, setSelectedVisionId] = useState<string | null>(null);
@@ -67,6 +78,33 @@ export default function App() {
       localStorage.setItem('theme', 'light');
     }
   }, [darkMode]);
+
+  // Close tools dropdown on click outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (toolsMenuRef.current && !toolsMenuRef.current.contains(e.target as Node)) {
+        setIsToolsMenuOpen(false);
+      }
+    };
+    if (isToolsMenuOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isToolsMenuOpen]);
+
+  // Global Command Palette keyboard shortcut (Ctrl+K or Cmd+K)
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        setIsCommandPaletteOpen((prev) => !prev);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   // Load state and authenticate user on mount
   useEffect(() => {
@@ -149,11 +187,21 @@ export default function App() {
         points = prev.scoreConfig[newOpp.category]?.[newOpp.type] || 1;
       }
 
+      const initialActivity: OpportunityActivity = {
+        id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        timestamp,
+        type: 'created',
+        title: 'Opportunity Documented',
+        details: `Initial attempt logged under ${newOpp.category}${newOpp.companyOrClient ? ` (${newOpp.companyOrClient})` : ''}`,
+        newStage: newOpp.stage || 'Sourced',
+      };
+
       const loggedOpp: Opportunity = {
         ...newOpp,
         id,
         timestamp,
         points,
+        activityLog: newOpp.activityLog && newOpp.activityLog.length > 0 ? newOpp.activityLog : [initialActivity],
       };
 
       const nextOpps = [loggedOpp, ...prev.opportunities];
@@ -220,6 +268,34 @@ export default function App() {
     });
   };
 
+  // Batch import multiple opportunities
+  const handleBatchImportOpportunities = (newOpps: Opportunity[]) => {
+    updateState((prev) => {
+      const nextOpps = [...newOpps, ...prev.opportunities];
+      // Recalculate visions
+      const nextVisions = prev.visions.map((vision) => {
+        const supportingLogs = nextOpps.filter((opp) => {
+          if (opp.linkedVisionId === vision.id) return true;
+          const matchesCategory = vision.supportingCategories.includes(opp.category);
+          const matchesType = vision.supportingTypes.includes(opp.type);
+          return matchesCategory || matchesType;
+        });
+        const completedPoints = supportingLogs.reduce((sum, opp) => sum + opp.points, 0);
+        return {
+          ...vision,
+          completedPoints,
+          isCompleted: completedPoints >= vision.targetPoints,
+        };
+      });
+
+      return {
+        ...prev,
+        opportunities: nextOpps,
+        visions: nextVisions,
+      };
+    });
+  };
+
   const getOffsetDateOnly = (daysOffset: number): string => {
     const d = new Date();
     d.setDate(d.getDate() + daysOffset);
@@ -255,10 +331,107 @@ export default function App() {
     });
   };
 
-  // 2.5 Update an opportunity
+  // 2.5 Update an opportunity with automated activity log tracking
   const handleUpdateOpportunity = (updatedOpp: Opportunity) => {
     updateState((prev) => {
-      const nextOpps = prev.opportunities.map((o) => (o.id === updatedOpp.id ? updatedOpp : o));
+      let nextPipes = prev.pipelines;
+      const existingOpp = prev.opportunities.find((o) => o.id === updatedOpp.id);
+      let nextActivityLog = updatedOpp.activityLog ? [...updatedOpp.activityLog] : [];
+
+      if (existingOpp) {
+        // Track stage change automatically
+        if (updatedOpp.stage && existingOpp.stage !== updatedOpp.stage) {
+          nextActivityLog.unshift({
+            id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            timestamp: new Date().toISOString(),
+            type: 'stage_change',
+            title: `Stage progressed to "${updatedOpp.stage}"`,
+            previousStage: existingOpp.stage || 'Sourced',
+            newStage: updatedOpp.stage,
+          });
+        }
+        // Track pipeline link
+        if (!existingOpp.pipelineId && updatedOpp.pipelineId) {
+          nextActivityLog.unshift({
+            id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            timestamp: new Date().toISOString(),
+            type: 'pipeline_linked',
+            title: 'Linked to Pipeline Tracker',
+            details: 'Active lifecycle connected',
+          });
+        }
+        // Track document attached
+        if (!existingOpp.fileName && updatedOpp.fileName) {
+          nextActivityLog.unshift({
+            id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            timestamp: new Date().toISOString(),
+            type: 'file_attached',
+            title: 'File Document Attached',
+            details: updatedOpp.fileName,
+          });
+        }
+      }
+
+      const oppWithActivity: Opportunity = {
+        ...updatedOpp,
+        activityLog: nextActivityLog,
+      };
+
+      // Two-way sync: if opportunity is linked to a pipeline and its stage changed, sync the pipeline!
+      if (oppWithActivity.pipelineId) {
+        nextPipes = prev.pipelines.map((pipe) => {
+          if (pipe.id === oppWithActivity.pipelineId) {
+            const targetStageName = oppWithActivity.stage;
+            if (!targetStageName) return pipe;
+
+            const stageIdx = pipe.stages.findIndex(
+              (s) => s.name.toLowerCase() === targetStageName.toLowerCase()
+            );
+
+            if (stageIdx >= 0) {
+              const updatedStages = [...pipe.stages];
+              for (let i = 0; i <= stageIdx; i++) {
+                if (!updatedStages[i].completedAt) {
+                  updatedStages[i] = { ...updatedStages[i], completedAt: new Date().toISOString() };
+                }
+              }
+              const isLastStage = stageIdx === pipe.stages.length - 1;
+              return {
+                ...pipe,
+                stages: updatedStages,
+                currentStageIndex: stageIdx,
+                status: (isLastStage ? 'won' : 'active') as 'won' | 'active',
+                updatedAt: new Date().toISOString(),
+              };
+            } else if (
+              targetStageName.includes('Won') ||
+              targetStageName.includes('Awarded') ||
+              targetStageName.includes('Paid') ||
+              targetStageName.includes('Completed')
+            ) {
+              return {
+                ...pipe,
+                status: 'won' as const,
+                currentStageIndex: pipe.stages.length - 1,
+                updatedAt: new Date().toISOString(),
+              };
+            } else if (
+              targetStageName.includes('Lost') ||
+              targetStageName.includes('Not Selected') ||
+              targetStageName.includes('Dropped')
+            ) {
+              return {
+                ...pipe,
+                status: 'lost' as const,
+                updatedAt: new Date().toISOString(),
+              };
+            }
+          }
+          return pipe;
+        });
+      }
+
+      const nextOpps = prev.opportunities.map((o) => (o.id === oppWithActivity.id ? oppWithActivity : o));
 
       // Dynamically recalculate completed points on all active visions
       const nextVisions = prev.visions.map((vision) => {
@@ -280,6 +453,7 @@ export default function App() {
         ...prev,
         opportunities: nextOpps,
         visions: nextVisions,
+        pipelines: nextPipes,
       };
     });
   };
@@ -289,7 +463,7 @@ export default function App() {
     updateState((prev) => {
       const pipe: OpportunityPipeline = {
         ...newPipe,
-        id: `pipe-${Date.now()}`,
+        id: (newPipe as any).id || `pipe-${Date.now()}`,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -300,22 +474,59 @@ export default function App() {
     });
   };
 
-  // 4. Update Opportunity Pipeline
+  // 4. Update Opportunity Pipeline with two-way sync to linked Opportunity
   const handleUpdatePipeline = (updatedPipe: OpportunityPipeline) => {
     updateState((prev) => {
       const nextPipes = prev.pipelines.map((p) => (p.id === updatedPipe.id ? updatedPipe : p));
+
+      // Two-way sync: update the linked opportunity's stage and pipeline link
+      const nextOpps = prev.opportunities.map((opp) => {
+        if (opp.pipelineId === updatedPipe.id || (updatedPipe.linkedOpportunityId && opp.id === updatedPipe.linkedOpportunityId)) {
+          let syncedStage = opp.stage;
+          if (updatedPipe.status === 'won') {
+            syncedStage = updatedPipe.stages[updatedPipe.stages.length - 1]?.name || 'Won 🎉';
+          } else if (updatedPipe.status === 'lost') {
+            syncedStage = 'Lost';
+          } else if (updatedPipe.stages[updatedPipe.currentStageIndex]) {
+            syncedStage = updatedPipe.stages[updatedPipe.currentStageIndex].name;
+          }
+
+          let actLog = opp.activityLog ? [...opp.activityLog] : [];
+          if (syncedStage && opp.stage !== syncedStage) {
+            actLog.unshift({
+              id: `act-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+              timestamp: new Date().toISOString(),
+              type: 'stage_change',
+              title: `Stage progressed to "${syncedStage}" via Pipeline`,
+              previousStage: opp.stage,
+              newStage: syncedStage,
+            });
+          }
+
+          return {
+            ...opp,
+            pipelineId: updatedPipe.id,
+            stage: syncedStage,
+            activityLog: actLog,
+          };
+        }
+        return opp;
+      });
+
       return {
         ...prev,
         pipelines: nextPipes,
+        opportunities: nextOpps,
       };
     });
   };
 
-  // 5. Delete Opportunity Pipeline
+  // 5. Delete Opportunity Pipeline and safely unlink Opportunity
   const handleDeletePipeline = (id: string) => {
     updateState((prev) => ({
       ...prev,
       pipelines: prev.pipelines.filter((p) => p.id !== id),
+      opportunities: prev.opportunities.map((o) => (o.pipelineId === id ? { ...o, pipelineId: undefined } : o)),
     }));
   };
 
@@ -628,177 +839,233 @@ export default function App() {
   return (
     <div className="min-h-screen bg-cream-100 dark:bg-sepia-950 text-sepia-900 dark:text-cream-100 font-sans flex flex-col transition-colors duration-300">
       {/* Premium Navigation Header */}
-      <header className="sticky top-0 bg-white dark:bg-sepia-900 border-b border-cream-200 dark:border-sepia-800 z-40 shadow-sm">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center justify-between w-full md:w-auto">
-            <div className="flex items-center gap-4">
-              <div className="w-10 h-10 bg-readflow-green dark:bg-readflow-olive rounded-lg flex items-center justify-center text-cream-100 font-serif font-bold text-xl shadow-sm">
+      <header className="sticky top-0 bg-white/95 dark:bg-sepia-900/95 backdrop-blur-md border-b border-cream-200 dark:border-sepia-800 z-40 shadow-xs transition-colors duration-300">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-2.5 sm:py-3 flex items-center justify-between gap-3">
+          {/* Brand & Compact Challenge Progress Capsule */}
+          <div className="flex items-center gap-3 sm:gap-4 min-w-0">
+            <div className="flex items-center gap-2.5 sm:gap-3 shrink-0">
+              <div className="w-9 h-9 sm:w-10 sm:h-10 bg-readflow-green dark:bg-readflow-olive rounded-xl flex items-center justify-center text-cream-100 font-serif font-bold text-lg sm:text-xl shadow-xs">
                 O
               </div>
-              <div>
-                <h1 className="text-2xl font-serif font-bold tracking-tight text-sepia-900 dark:text-cream-100 leading-none">
-                  1000 Opportunities
-                </h1>
-                <span className="text-[10px] font-mono font-bold text-readflow-olive dark:text-readflow-gold uppercase tracking-widest block mt-1">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2">
+                  <h1 className="text-xl sm:text-2xl font-serif font-bold tracking-tight text-sepia-900 dark:text-cream-100 leading-none">
+                    1000 Opportunities
+                  </h1>
+                </div>
+                <span className="hidden sm:block text-[10px] font-mono font-bold text-readflow-olive dark:text-readflow-gold uppercase tracking-wider mt-1 truncate">
                   Your future is created, not awaited
                 </span>
               </div>
             </div>
-            
-            {/* Mobile Nav Actions */}
-            <div className="flex items-center gap-1.5 md:hidden">
-              <button
-                onClick={() => setIsBadgesOpen(true)}
-                className="p-2 rounded-lg bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 transition-all cursor-pointer"
-                title="View Milestone Badges"
-              >
-                <Award className="w-4 h-4 text-amber-500" />
-              </button>
 
-              <button
-                onClick={() => setIsReportOpen(true)}
-                className="p-2 rounded-lg bg-readflow-green/10 dark:bg-readflow-green/20 border border-readflow-green/20 text-readflow-green dark:text-readflow-lightgreen transition-all cursor-pointer"
-                title="Generate Weekly Catalyst Report"
-              >
-                <Printer className="w-4 h-4 text-readflow-gold" />
-              </button>
-
-              <div className="flex items-center gap-1 px-1.5 py-1 rounded-full bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 shadow-sm">
-                {currentUser.avatarUrl ? (
-                  <img src={currentUser.avatarUrl} alt={currentUser.name || 'User'} className="w-5 h-5 rounded-full object-cover" />
-                ) : (
-                  <div className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold uppercase">
-                    {(currentUser.name || currentUser.email)[0]}
-                  </div>
-                )}
-                <button
-                  onClick={handleSignOut}
-                  className="p-1 text-sepia-400 hover:text-rose-500 transition-colors cursor-pointer"
-                  title="Sign Out"
-                >
-                  <LogOut className="w-3 h-3" />
-                </button>
+            {/* Compact Challenge Progress Capsule */}
+            <button
+              onClick={() => setIsRoadmapOpen(true)}
+              className="flex items-center gap-2 px-2.5 py-1.5 rounded-full bg-cream-50 dark:bg-sepia-800/80 border border-cream-200 dark:border-sepia-700 hover:border-readflow-green/40 dark:hover:border-readflow-lightgreen/40 transition-all cursor-pointer group shadow-2xs shrink-0"
+              title="Click to view Road to 1,000 Milestone Roadmap"
+            >
+              <div className="flex flex-col text-left">
+                <div className="flex items-center gap-1.5 leading-none">
+                  <span className="text-[11px] font-mono font-bold text-sepia-850 dark:text-cream-100">
+                    {totalOppsCount}
+                    <span className="text-sepia-400 dark:text-sepia-500 font-normal">/1k</span>
+                  </span>
+                  <span className="text-[10px] font-mono font-bold text-readflow-green dark:text-readflow-lightgreen bg-readflow-green/10 dark:bg-readflow-green/20 px-1.5 py-0.2 rounded-full">
+                    {challengeProgressPercent}%
+                  </span>
+                </div>
+                <div className="w-14 sm:w-20 h-1.5 bg-cream-200 dark:bg-sepia-700 rounded-full overflow-hidden mt-1">
+                  <div
+                    className="h-full bg-readflow-green dark:bg-readflow-lightgreen transition-all duration-500 rounded-full"
+                    style={{ width: `${Math.max(challengeProgressPercent, 2)}%` }}
+                  />
+                </div>
               </div>
-
-              <button
-                onClick={() => setDarkMode(!darkMode)}
-                className="p-2 rounded-lg bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 text-sepia-700 dark:text-cream-200 hover:bg-cream-150 dark:hover:bg-sepia-750 transition-all cursor-pointer"
-                title="Toggle theme"
-              >
-                {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
-              </button>
-            </div>
+            </button>
           </div>
 
-          {/* Core Counter Progress Bar */}
-          <div className="flex items-center justify-between md:justify-end gap-6 w-full md:w-auto border-t md:border-t-0 border-cream-150 dark:border-sepia-800 pt-4 md:pt-0">
-            <div className="flex items-center gap-8">
-              <div className="flex flex-col items-end">
-                <span className="text-[10px] font-mono font-bold text-sepia-400 dark:text-sepia-500 uppercase tracking-widest">Total Progress</span>
-                <div className="flex items-center gap-3 mt-1">
-                  <span className="text-lg font-mono font-bold text-sepia-800 dark:text-cream-100">{totalOppsCount} / 1000</span>
-                  <div className="w-32 sm:w-48 h-2 bg-cream-150 dark:bg-sepia-800 rounded-full overflow-hidden border border-cream-200 dark:border-sepia-700">
-                    <div
-                      className="h-full bg-readflow-green dark:bg-readflow-lightgreen transition-all duration-500"
-                      style={{ width: `${challengeProgressPercent}%` }}
-                    />
+          {/* Action Center & Theme Switcher */}
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* AI Assistant button */}
+            <button
+              id="header-ai-btn"
+              onClick={() => setIsAIOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-readflow-green/30 bg-readflow-green/10 dark:bg-readflow-lightgreen/15 text-readflow-green dark:text-readflow-lightgreen hover:bg-readflow-green hover:text-cream-50 dark:hover:bg-readflow-green dark:hover:text-cream-50 text-xs font-bold cursor-pointer transition-all shadow-2xs"
+              title="AI Opportunity Parser, Resume Matcher & Outreach Generator"
+            >
+              <Sparkles className="w-3.5 h-3.5" />
+              <span className="hidden sm:inline">AI Copilot</span>
+            </button>
+
+            {/* Road to 1,000 Roadmap */}
+            <button
+              id="header-roadmap-btn"
+              onClick={() => setIsRoadmapOpen(true)}
+              className="hidden md:flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-cream-200 dark:border-sepia-800 bg-cream-50/70 dark:bg-sepia-850 hover:bg-cream-100 dark:hover:bg-sepia-800 text-sepia-700 dark:text-cream-200 text-xs font-bold cursor-pointer transition-all shadow-2xs"
+              title="Road to 1,000 Milestone Stations & Sprints"
+            >
+              <Trophy className="w-3.5 h-3.5 text-readflow-gold" />
+              <span>Roadmap</span>
+            </button>
+
+            {/* Command Palette Trigger */}
+            <button
+              id="header-command-palette-btn"
+              onClick={() => setIsCommandPaletteOpen(true)}
+              className="flex items-center gap-1.5 px-2.5 sm:px-3 py-1.5 rounded-xl border border-cream-200 dark:border-sepia-800 bg-cream-50/70 dark:bg-sepia-850 text-sepia-650 dark:text-cream-200 hover:border-readflow-green/60 text-xs font-semibold cursor-pointer transition-all shadow-2xs"
+              title="Open Command Palette (Ctrl+K)"
+            >
+              <Search className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+              <span className="hidden lg:inline">Search</span>
+              <kbd className="hidden sm:inline-block px-1.5 py-0.2 text-[9px] font-mono font-bold bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-750 rounded text-sepia-500 dark:text-cream-300">
+                Ctrl K
+              </kbd>
+            </button>
+
+            {/* Quick Tools Dropdown */}
+            <div className="relative" ref={toolsMenuRef}>
+              <button
+                id="header-tools-menu-btn"
+                onClick={() => setIsToolsMenuOpen(!isToolsMenuOpen)}
+                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl border text-xs font-semibold transition-all cursor-pointer shadow-2xs ${
+                  isToolsMenuOpen
+                    ? 'border-readflow-green bg-cream-150 dark:bg-sepia-800 text-readflow-green dark:text-readflow-lightgreen'
+                    : 'border-cream-200 dark:border-sepia-800 bg-cream-50/70 dark:bg-sepia-850 text-sepia-700 dark:text-cream-200 hover:bg-cream-100 dark:hover:bg-sepia-800'
+                }`}
+                title="Quick Tools & Actions"
+              >
+                <MoreHorizontal className="w-4 h-4" />
+                <span className="hidden sm:inline">Tools</span>
+              </button>
+
+              {isToolsMenuOpen && (
+                <div className="absolute right-0 mt-2 w-60 rounded-2xl bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-800 shadow-xl py-1.5 z-50 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-1.5 text-[10px] font-mono font-bold uppercase tracking-wider text-sepia-400 dark:text-sepia-500 border-b border-cream-150 dark:border-sepia-800">
+                    Quick Tools & Utilities
                   </div>
+                  
+                  <button
+                    id="header-import-csv-btn"
+                    onClick={() => { setIsCSVImportOpen(true); setIsToolsMenuOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-xs font-medium text-sepia-800 dark:text-cream-100 hover:bg-cream-100 dark:hover:bg-sepia-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    <div>
+                      <div className="font-bold">Import CSV / Excel</div>
+                      <div className="text-[10px] text-sepia-400 dark:text-sepia-500">Batch add opportunities</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setIsReportOpen(true); setIsToolsMenuOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-xs font-medium text-sepia-800 dark:text-cream-100 hover:bg-cream-100 dark:hover:bg-sepia-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                  >
+                    <Printer className="w-4 h-4 text-readflow-gold shrink-0" />
+                    <div>
+                      <div className="font-bold">Weekly Catalyst Report</div>
+                      <div className="text-[10px] text-sepia-400 dark:text-sepia-500">Printable review dossier</div>
+                    </div>
+                  </button>
+
+                  <button
+                    onClick={() => { setIsBadgesOpen(true); setIsToolsMenuOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-xs font-medium text-sepia-800 dark:text-cream-100 hover:bg-cream-100 dark:hover:bg-sepia-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                  >
+                    <Award className="w-4 h-4 text-amber-500 shrink-0" />
+                    <div>
+                      <div className="font-bold">Milestone Badges</div>
+                      <div className="text-[10px] text-sepia-400 dark:text-sepia-500">View unlocked achievements</div>
+                    </div>
+                  </button>
+
+                  {canInstall && (
+                    <button
+                      id="pwa-install-btn"
+                      onClick={() => { promptInstall(); setIsToolsMenuOpen(false); }}
+                      className="w-full text-left px-3 py-2 text-xs font-medium text-sepia-800 dark:text-cream-100 hover:bg-cream-100 dark:hover:bg-sepia-800 flex items-center gap-2.5 cursor-pointer transition-colors"
+                    >
+                      <Smartphone className="w-4 h-4 text-readflow-green dark:text-readflow-lightgreen shrink-0" />
+                      <div>
+                        <div className="font-bold">Install PWA App</div>
+                        <div className="text-[10px] text-sepia-400 dark:text-sepia-500">Install to your device</div>
+                      </div>
+                    </button>
+                  )}
+
+                  <button
+                    onClick={() => { setIsOnboardingOpen(true); setIsToolsMenuOpen(false); }}
+                    className="w-full text-left px-3 py-2 text-xs font-medium text-sepia-800 dark:text-cream-100 hover:bg-cream-100 dark:hover:bg-sepia-800 flex items-center gap-2.5 cursor-pointer transition-colors border-t border-cream-150 dark:border-sepia-800 mt-1"
+                  >
+                    <HelpCircle className="w-4 h-4 text-readflow-olive dark:text-readflow-gold shrink-0" />
+                    <div>
+                      <div className="font-bold">Re-open Tour</div>
+                      <div className="text-[10px] text-sepia-400 dark:text-sepia-500">Onboarding walkthrough</div>
+                    </div>
+                  </button>
                 </div>
-              </div>
-              <div className="w-10 h-10 rounded-full bg-cream-50 dark:bg-sepia-800 border-2 border-white dark:border-sepia-700 shadow-sm flex items-center justify-center text-readflow-green dark:text-readflow-lightgreen font-bold font-mono text-xs">
-                {challengeProgressPercent}%
-              </div>
+              )}
             </div>
 
-            {/* Desktop Theme Switcher & User Account */}
-            <div className="hidden md:flex items-center gap-2.5">
-              {canInstall && (
-                <button
-                  id="pwa-install-btn"
-                  onClick={promptInstall}
-                  className="px-3 py-2 rounded-xl bg-readflow-green/10 dark:bg-readflow-green/20 border border-readflow-green/20 text-readflow-green dark:text-readflow-lightgreen text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer hover:bg-readflow-green/20"
-                  title="Install 1000 Opportunities Challenge to your device"
-                >
-                  <Smartphone className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
-                  <span>Install App</span>
-                </button>
+            {/* THE PROMINENT THEME TOGGLE (MODE CHANGER) - Always visible, never cut off! */}
+            <button
+              id="header-theme-toggle-btn"
+              onClick={() => setDarkMode(!darkMode)}
+              className="px-2.5 py-1.5 rounded-xl bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 text-sepia-800 dark:text-cream-100 hover:bg-cream-150 dark:hover:bg-sepia-750 transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+              title={darkMode ? "Switch to Light Mode" : "Switch to Dark Mode"}
+              aria-label="Toggle theme mode"
+            >
+              {darkMode ? (
+                <Sun className="w-4 h-4 text-amber-400" />
+              ) : (
+                <Moon className="w-4 h-4 text-indigo-600" />
               )}
+              <span className="text-xs font-bold text-sepia-700 dark:text-cream-200 hidden sm:inline">
+                {darkMode ? "Light" : "Dark"}
+              </span>
+            </button>
 
-              <button
-                onClick={() => setIsBadgesOpen(true)}
-                className="px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer hover:bg-amber-100 dark:hover:bg-amber-900/60"
-                title="View Milestone Badges"
-              >
-                <Award className="w-3.5 h-3.5 text-amber-500" />
-                <span>Badges</span>
-              </button>
-
-              <button
-                onClick={() => setIsReportOpen(true)}
-                className="px-3 py-2 rounded-xl bg-readflow-green/10 dark:bg-readflow-green/20 border border-readflow-green/20 text-readflow-green dark:text-readflow-lightgreen text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer hover:bg-readflow-green/20"
-                title="Generate Weekly Catalyst Report"
-              >
-                <Printer className="w-3.5 h-3.5 text-readflow-gold" />
-                <span>Report</span>
-              </button>
-
-              <div className="flex items-center gap-2.5 px-3 py-1.5 rounded-full bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 shadow-sm">
-                {currentUser.avatarUrl ? (
-                  <img src={currentUser.avatarUrl} alt={currentUser.name || 'User'} className="w-6 h-6 rounded-full object-cover" />
-                ) : (
-                  <div className="w-6 h-6 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold uppercase">
-                    {(currentUser.name || currentUser.email)[0]}
-                  </div>
-                )}
-                <div className="flex flex-col text-left">
-                  <span className="text-xs font-bold truncate max-w-[100px] text-sepia-900 dark:text-cream-100 leading-tight">
-                    {currentUser.name || currentUser.email.split('@')[0]}
-                  </span>
-                  {!isOnline ? (
-                    <span className="text-[9px] text-amber-600 dark:text-amber-400 font-mono font-bold flex items-center gap-0.5 animate-pulse" title="Offline Mode: Changes saved locally">
-                      <WifiOff className="w-2.5 h-2.5" /> Offline
-                    </span>
-                  ) : isSyncing ? (
-                    <span className="text-[9px] text-blue-600 dark:text-blue-400 font-mono font-bold flex items-center gap-0.5" title="Syncing changes to cloud...">
-                      <RefreshCw className="w-2.5 h-2.5 animate-spin" /> Syncing...
-                    </span>
-                  ) : hasPendingSync ? (
-                    <button
-                      onClick={triggerSync}
-                      className="text-[9px] text-amber-600 dark:text-amber-400 font-mono font-bold flex items-center gap-0.5 underline cursor-pointer hover:text-amber-700"
-                      title="Click to sync offline changes now"
-                    >
-                      <Cloud className="w-2.5 h-2.5" /> Sync Cloud
-                    </button>
-                  ) : (
-                    <span className="text-[9px] text-emerald-600 dark:text-emerald-400 font-mono font-semibold flex items-center gap-0.5">
-                      <Cloud className="w-2.5 h-2.5" /> Cloud DB
-                    </span>
-                  )}
+            {/* User Account Capsule */}
+            <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 shadow-2xs">
+              {currentUser.avatarUrl ? (
+                <img src={currentUser.avatarUrl} alt={currentUser.name || 'User'} className="w-5 h-5 rounded-full object-cover" />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-indigo-600 text-white flex items-center justify-center text-[10px] font-bold uppercase">
+                  {(currentUser.name || currentUser.email)[0]}
                 </div>
-                <button
-                  onClick={handleSignOut}
-                  className="ml-1 p-1 rounded-full text-sepia-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
-                  title="Sign Out"
-                >
-                  <LogOut className="w-3.5 h-3.5" />
-                </button>
+              )}
+              <div className="hidden md:flex flex-col text-left">
+                <span className="text-xs font-bold truncate max-w-[85px] lg:max-w-[105px] text-sepia-900 dark:text-cream-100 leading-tight">
+                  {currentUser.name || currentUser.email.split('@')[0]}
+                </span>
+                {!isOnline ? (
+                  <span className="text-[8px] text-amber-600 dark:text-amber-400 font-mono font-bold flex items-center gap-0.5 animate-pulse" title="Offline Mode: Changes saved locally">
+                    <WifiOff className="w-2 h-2" /> Offline
+                  </span>
+                ) : isSyncing ? (
+                  <span className="text-[8px] text-blue-600 dark:text-blue-400 font-mono font-bold flex items-center gap-0.5" title="Syncing changes to cloud...">
+                    <RefreshCw className="w-2 h-2 animate-spin" /> Syncing...
+                  </span>
+                ) : hasPendingSync ? (
+                  <button
+                    onClick={triggerSync}
+                    className="text-[8px] text-amber-600 dark:text-amber-400 font-mono font-bold flex items-center gap-0.5 underline cursor-pointer hover:text-amber-700"
+                    title="Click to sync offline changes now"
+                  >
+                    <Cloud className="w-2 h-2" /> Sync Cloud
+                  </button>
+                ) : (
+                  <span className="text-[8px] text-emerald-600 dark:text-emerald-400 font-mono font-semibold flex items-center gap-0.5">
+                    <Cloud className="w-2 h-2" /> Cloud DB
+                  </span>
+                )}
               </div>
-
               <button
-                onClick={() => setIsOnboardingOpen(true)}
-                className="p-2.5 rounded-lg bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 text-sepia-700 dark:text-cream-200 hover:bg-cream-150 dark:hover:bg-sepia-750 transition-all cursor-pointer"
-                title="Re-open Onboarding Tour"
+                onClick={handleSignOut}
+                className="p-1 rounded-full text-sepia-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
+                title="Sign Out"
               >
-                <HelpCircle className="w-4 h-4 text-readflow-gold" />
-              </button>
-
-              <button
-                onClick={() => setDarkMode(!darkMode)}
-                className="p-2.5 rounded-lg bg-cream-50 dark:bg-sepia-800 border border-cream-200 dark:border-sepia-700 text-sepia-700 dark:text-cream-200 hover:bg-cream-150 dark:hover:bg-sepia-750 transition-all cursor-pointer"
-                title="Toggle theme"
-              >
-                {darkMode ? <Sun className="w-4 h-4" /> : <Moon className="w-4 h-4" />}
+                <LogOut className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
@@ -813,8 +1080,8 @@ export default function App() {
             onClick={() => setCurrentView('dashboard')}
             className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 cursor-pointer ${
               currentView === 'dashboard'
-                ? 'border-readflow-green text-readflow-green dark:text-readflow-lightgreen font-extrabold'
-                : 'border-transparent text-sepia-400 hover:text-sepia-750 dark:text-sepia-300'
+                ? 'border-readflow-green dark:border-readflow-lightgreen text-readflow-green dark:text-readflow-lightgreen font-extrabold'
+                : 'border-transparent text-sepia-400 hover:text-sepia-750 dark:text-cream-300 dark:hover:text-cream-100'
             }`}
           >
             <LayoutDashboard className="w-4 h-4" />
@@ -825,13 +1092,13 @@ export default function App() {
             onClick={() => setCurrentView('logbook')}
             className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 cursor-pointer ${
               currentView === 'logbook'
-                ? 'border-readflow-green text-readflow-green dark:text-readflow-lightgreen font-extrabold'
-                : 'border-transparent text-sepia-400 hover:text-sepia-750 dark:text-sepia-300'
+                ? 'border-readflow-green dark:border-readflow-lightgreen text-readflow-green dark:text-readflow-lightgreen font-extrabold'
+                : 'border-transparent text-sepia-400 hover:text-sepia-750 dark:text-cream-300 dark:hover:text-cream-100'
             }`}
           >
             <ClipboardList className="w-4 h-4" />
             Opportunities Logbook
-            <span className="bg-cream-150 dark:bg-sepia-850 text-sepia-600 dark:text-cream-200 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">
+            <span className="bg-cream-150 dark:bg-sepia-800 text-sepia-700 dark:text-cream-200 border border-cream-200 dark:border-sepia-700 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">
               {logbookOpportunitiesCount}
             </span>
           </button>
@@ -840,13 +1107,13 @@ export default function App() {
             onClick={() => setCurrentView('checklist')}
             className={`flex items-center gap-2 px-4 py-3 text-xs font-bold transition-all border-b-2 cursor-pointer ${
               currentView === 'checklist'
-                ? 'border-readflow-green text-readflow-green dark:text-readflow-lightgreen font-extrabold'
-                : 'border-transparent text-sepia-400 hover:text-sepia-750 dark:text-sepia-300'
+                ? 'border-readflow-green dark:border-readflow-lightgreen text-readflow-green dark:text-readflow-lightgreen font-extrabold'
+                : 'border-transparent text-sepia-400 hover:text-sepia-750 dark:text-cream-300 dark:hover:text-cream-100'
             }`}
           >
             <ListChecks className="w-4 h-4" />
             Checklist Grid
-            <span className="bg-cream-150 dark:bg-sepia-850 text-sepia-600 dark:text-cream-200 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">
+            <span className="bg-cream-150 dark:bg-sepia-800 text-sepia-700 dark:text-cream-200 border border-cream-200 dark:border-sepia-700 px-2 py-0.5 rounded-full text-[10px] font-mono font-bold">
               {(state.checklistHabits || []).length}
             </span>
           </button>
@@ -854,7 +1121,7 @@ export default function App() {
       </div>
 
       {/* Main Content Workspace */}
-      <main className="flex-1 max-w-7xl mx-auto px-6 py-6 w-full space-y-6">
+      <main className={`flex-1 w-full py-6 pb-24 sm:pb-6 space-y-6 ${currentView === 'logbook' ? 'px-4 lg:px-8' : 'max-w-7xl mx-auto px-6'}`}>
         {currentView === 'privacy' ? (
           <PrivacyPage onBack={() => setCurrentView('dashboard')} darkMode={darkMode} />
         ) : currentView === 'terms' ? (
@@ -934,9 +1201,11 @@ export default function App() {
               <div className="lg:col-span-2" id="pipeline-panel">
                 <Pipeline
                   pipelines={state.pipelines}
+                  opportunities={state.opportunities}
                   onAddPipeline={handleAddPipeline}
                   onUpdatePipeline={handleUpdatePipeline}
                   onDeletePipeline={handleDeletePipeline}
+                  onUpdateOpportunity={handleUpdateOpportunity}
                   activePipelineId={activePipelineId}
                   onSelectPipeline={setActivePipelineId}
                 />
@@ -953,7 +1222,7 @@ export default function App() {
             </section>
 
             {/* Bottom Drawer Tabs: Saved Records and Settings Config */}
-            <section id="drawer-section" className="bg-white dark:bg-sepia-900 rounded-2xl border border-cream-200 dark:border-sepia-800 overflow-hidden shadow-sm transition-all duration-300">
+            <section id="drawer-section" className="w-full bg-white dark:bg-sepia-900 rounded-2xl border border-cream-200 dark:border-sepia-800 overflow-hidden shadow-sm transition-all duration-300">
               {/* Toggle buttons */}
               <div className="flex border-b border-cream-150 dark:border-sepia-800 bg-cream-50/50 dark:bg-sepia-900/60 p-2 gap-2">
                 <button
@@ -998,7 +1267,7 @@ export default function App() {
               </div>
 
               {/* Active drawer pane */}
-              <div className="p-1">
+              <div className="p-1 w-full">
                 {activeBottomTab === 'vault' ? (
                   <Vault
                     opportunities={state.opportunities}
@@ -1069,14 +1338,17 @@ export default function App() {
             onUpdateOpportunity={handleUpdateOpportunity}
             onDeleteOpportunity={handleDeleteOpportunity}
             onAddPipeline={handleAddPipeline}
+            onUpdatePipeline={handleUpdatePipeline}
             onNavigateToDashboard={() => setCurrentView('dashboard')}
             onSelectPipeline={setActivePipelineId}
+            onOpenCSVImport={() => setIsCSVImportOpen(true)}
+            onOpenAIParser={() => setIsAIOpen(true)}
           />
         )}
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 mt-12 py-6 text-center text-xs text-slate-400">
+      <footer className="border-t border-slate-200 dark:border-slate-850 bg-white dark:bg-slate-900 mt-12 py-6 pb-24 sm:pb-6 text-center text-xs text-slate-400">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="font-semibold text-slate-400">
             "Your life changes when the number of opportunities you create exceeds the number you wait for."
@@ -1146,6 +1418,185 @@ export default function App() {
         visions={state.visions}
         userName={currentUser?.name || currentUser?.email}
       />
+
+      {/* Global Command Palette (Ctrl+K / Cmd+K) */}
+      <CommandPalette
+        isOpen={isCommandPaletteOpen}
+        onClose={() => setIsCommandPaletteOpen(false)}
+        opportunities={state.opportunities}
+        pipelines={state.pipelines}
+        visions={state.visions}
+        onNavigate={(view) => setCurrentView(view)}
+        onSelectPipeline={(id) => setActivePipelineId(id)}
+        onSelectVision={(id) => {
+          setSelectedVisionId(id);
+          setCurrentView('vision-details');
+        }}
+        onToggleDarkMode={() => setDarkMode(!darkMode)}
+        onExportCSV={() => {
+          // Trigger export in logbook or direct
+          setCurrentView('logbook');
+        }}
+        onQuickLogCategory={(cat) => {
+          setCurrentView('dashboard');
+          setTimeout(() => {
+            const el = document.getElementById('catalyst-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }}
+        onOpenAIParser={() => setIsAIOpen(true)}
+        onOpenCSVImport={() => setIsCSVImportOpen(true)}
+        onOpenRoadmap={() => setIsRoadmapOpen(true)}
+        darkMode={darkMode}
+      />
+
+      {/* AI Opportunity Parser & Pitch Generator Modal */}
+      <AIOpportunityModal
+        isOpen={isAIOpen}
+        onClose={() => {
+          setIsAIOpen(false);
+          setSelectedAIOpp(null);
+        }}
+        onAddOpportunity={handleLogOpportunity}
+        onUpdateOpportunity={handleUpdateOpportunity}
+        opportunities={state.opportunities}
+        initialOpportunity={selectedAIOpp}
+      />
+
+      {/* CSV Spreadsheet Bulk Import Modal */}
+      <CSVImportModal
+        isOpen={isCSVImportOpen}
+        onClose={() => setIsCSVImportOpen(false)}
+        onImportOpportunities={handleBatchImportOpportunities}
+      />
+
+      {/* Gamified Road to 1,000 Roadmap Modal */}
+      <RoadmapModal
+        isOpen={isRoadmapOpen}
+        onClose={() => setIsRoadmapOpen(false)}
+        opportunities={state.opportunities}
+        onOpenQuickLogger={() => {
+          setCurrentView('dashboard');
+          setTimeout(() => {
+            const el = document.getElementById('catalyst-section');
+            if (el) el.scrollIntoView({ behavior: 'smooth' });
+          }, 100);
+        }}
+      />
+
+      {/* Mobile Bottom Navigation Bar */}
+      <nav
+        id="mobile-bottom-nav"
+        aria-label="Mobile Bottom Navigation"
+        className="sm:hidden fixed bottom-0 left-0 right-0 z-40 bg-white/95 dark:bg-sepia-900/95 backdrop-blur-md border-t border-cream-200 dark:border-sepia-800 px-3 py-1.5 flex items-center justify-around shadow-2xl pb-[max(0.5rem,env(safe-area-inset-bottom))]"
+      >
+        <button
+          type="button"
+          id="mobile-nav-dashboard"
+          onClick={() => {
+            setCurrentView('dashboard');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-lg transition-colors cursor-pointer ${
+            currentView === 'dashboard'
+              ? 'text-readflow-green dark:text-readflow-lightgreen font-bold'
+              : 'text-sepia-400 hover:text-sepia-700 dark:hover:text-cream-200'
+          }`}
+        >
+          <LayoutDashboard className="w-5 h-5" />
+          <span className="text-[10px] tracking-tight">Dashboard</span>
+        </button>
+
+        <button
+          type="button"
+          id="mobile-nav-logbook"
+          onClick={() => {
+            setCurrentView('logbook');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`relative flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-lg transition-colors cursor-pointer ${
+            currentView === 'logbook'
+              ? 'text-readflow-green dark:text-readflow-lightgreen font-bold'
+              : 'text-sepia-400 hover:text-sepia-700 dark:hover:text-cream-200'
+          }`}
+        >
+          <ClipboardList className="w-5 h-5" />
+          <span className="text-[10px] tracking-tight">Logbook</span>
+          {logbookOpportunitiesCount > 0 && (
+            <span className="absolute top-0 right-1.5 bg-readflow-green dark:bg-readflow-lightgreen text-cream-50 dark:text-sepia-950 text-[9px] font-mono font-bold px-1 rounded-full min-w-4 text-center leading-tight">
+              {logbookOpportunitiesCount}
+            </span>
+          )}
+        </button>
+
+        {/* Center Floating Quick Action Button */}
+        <div className="relative -top-3">
+          <button
+            type="button"
+            id="mobile-nav-quick-action"
+            onClick={() => {
+              if (currentView !== 'dashboard') {
+                setCurrentView('dashboard');
+              }
+              setTimeout(() => {
+                const catalystEl = document.getElementById('catalyst-section');
+                if (catalystEl) {
+                  catalystEl.scrollIntoView({ behavior: 'smooth' });
+                }
+              }, 100);
+            }}
+            className="w-12 h-12 rounded-full bg-gradient-to-tr from-readflow-olive to-readflow-green text-cream-50 flex items-center justify-center shadow-lg shadow-readflow-green/30 hover:scale-105 active:scale-95 transition-transform cursor-pointer border-2 border-white dark:border-sepia-900"
+            title="Quick Log Opportunity"
+          >
+            <Sparkles className="w-5 h-5" />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          id="mobile-nav-checklist"
+          onClick={() => {
+            setCurrentView('checklist');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          className={`relative flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-lg transition-colors cursor-pointer ${
+            currentView === 'checklist'
+              ? 'text-readflow-green dark:text-readflow-lightgreen font-bold'
+              : 'text-sepia-400 hover:text-sepia-700 dark:hover:text-cream-200'
+          }`}
+        >
+          <ListChecks className="w-5 h-5" />
+          <span className="text-[10px] tracking-tight">Checklist</span>
+          {(state?.checklistHabits || []).length > 0 && (
+            <span className="absolute top-0 right-1.5 bg-readflow-gold text-sepia-950 text-[9px] font-mono font-bold px-1 rounded-full min-w-4 text-center leading-tight">
+              {(state?.checklistHabits || []).length}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          id="mobile-nav-vault"
+          onClick={() => {
+            setCurrentView('dashboard');
+            setActiveBottomTab('vault');
+            setTimeout(() => {
+              const vaultEl = document.getElementById('drawer-section');
+              if (vaultEl) {
+                vaultEl.scrollIntoView({ behavior: 'smooth' });
+              }
+            }, 100);
+          }}
+          className={`flex flex-col items-center justify-center gap-1 py-1 px-2.5 rounded-lg transition-colors cursor-pointer ${
+            currentView === 'dashboard' && activeBottomTab === 'vault'
+              ? 'text-readflow-green dark:text-readflow-lightgreen font-bold'
+              : 'text-sepia-400 hover:text-sepia-700 dark:hover:text-cream-200'
+          }`}
+        >
+          <Archive className="w-5 h-5" />
+          <span className="text-[10px] tracking-tight">Vault</span>
+        </button>
+      </nav>
     </div>
   );
 }

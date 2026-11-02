@@ -9,6 +9,16 @@ export interface ScholarshipChecklistItem {
   completed: boolean;
 }
 
+export interface OpportunityActivity {
+  id: string;
+  timestamp: string; // ISO string
+  type: 'stage_change' | 'note' | 'file_attached' | 'pipeline_linked' | 'created';
+  title: string;
+  details?: string;
+  previousStage?: string;
+  newStage?: string;
+}
+
 export interface Opportunity {
   id: string;
   title: string;
@@ -34,6 +44,7 @@ export interface Opportunity {
   eligibilityChecklist?: ScholarshipChecklistItem[];
   requirementsChecklist?: ScholarshipChecklistItem[];
   tags?: string[];
+  activityLog?: OpportunityActivity[];
 }
 
 export function textToChecklistItems(text?: string): ScholarshipChecklistItem[] {
@@ -99,6 +110,7 @@ export interface OpportunityPipeline {
   status: 'active' | 'won' | 'lost';
   notes: string;
   category: string;
+  linkedOpportunityId?: string;
   updatedAt: string;
   createdAt: string;
 }
