@@ -5,7 +5,7 @@
 
 import React, { useState, useMemo, useRef } from 'react';
 import { Opportunity, ChecklistHabit, isChecklistOpportunity, textToChecklistItems } from '../types';
-import { Search, Download, Upload, Trash2, SlidersHorizontal, Archive, RefreshCw, Edit2, Check, X, Building, FileSpreadsheet, Coins, CheckSquare, ListChecks, Calendar, GraduationCap, MessageSquare, FileText } from 'lucide-react';
+import { Search, Download, Upload, Trash2, SlidersHorizontal, Archive, RefreshCw, Edit2, Check, X, Building, FileSpreadsheet, Coins, CheckSquare, ListChecks, Calendar, GraduationCap, MessageSquare, FileText, ChevronRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { CATEGORY_METADATA } from './QuickLogger';
 import { getCategoryFieldConfig } from '../utils/categoryFields';
 import { FormattedText } from './FormattedText';
@@ -31,6 +31,7 @@ export const Vault: React.FC<VaultProps> = ({
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [currentPage, setCurrentPage] = useState(1);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [expandedRows, setExpandedRows] = useState<Record<string, boolean>>({});
 
   // Inline edit states
   const [editingOppId, setEditingOppId] = useState<string | null>(null);
@@ -74,6 +75,30 @@ export const Vault: React.FC<VaultProps> = ({
   }, [filteredOpps, currentPage]);
 
   const totalPages = Math.ceil(filteredOpps.length / ITEMS_PER_PAGE) || 1;
+
+  const handleToggleRowExpand = (id: string) => {
+    setExpandedRows((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
+  };
+
+  const allRowsExpanded = useMemo(() => {
+    if (paginatedOpps.length === 0) return false;
+    return paginatedOpps.every((opp) => Boolean(expandedRows[opp.id]));
+  }, [paginatedOpps, expandedRows]);
+
+  const handleToggleAllRows = () => {
+    if (allRowsExpanded) {
+      setExpandedRows({});
+    } else {
+      const next: Record<string, boolean> = {};
+      paginatedOpps.forEach((opp) => {
+        next[opp.id] = true;
+      });
+      setExpandedRows(next);
+    }
+  };
 
   // Export database as JSON file
   const handleExport = () => {
@@ -286,22 +311,44 @@ export const Vault: React.FC<VaultProps> = ({
             />
           </div>
 
-          <div className="flex items-center gap-2">
-            <SlidersHorizontal className="w-4 h-4 text-sepia-400" />
-            <select
-              id="vault-category-select"
-              value={selectedCategory}
-              onChange={(e) => {
-                setSelectedCategory(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-700 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen cursor-pointer"
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <div className="flex items-center gap-2">
+              <SlidersHorizontal className="w-4 h-4 text-sepia-400" />
+              <select
+                id="vault-category-select"
+                value={selectedCategory}
+                onChange={(e) => {
+                  setSelectedCategory(e.target.value);
+                  setCurrentPage(1);
+                }}
+                className="px-3 py-2 text-xs rounded-xl border border-cream-200 dark:border-sepia-800 bg-transparent text-sepia-700 dark:text-cream-100 focus:outline-none focus:ring-1 focus:ring-readflow-green dark:focus:ring-readflow-lightgreen cursor-pointer"
+              >
+                <option value="All" className="bg-white dark:bg-sepia-900">All Categories</option>
+                {Object.keys(CATEGORY_METADATA).map((cat) => (
+                  <option key={cat} value={cat} className="bg-white dark:bg-sepia-900">{cat}</option>
+                ))}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              id="vault-toggle-all-expand-btn"
+              onClick={handleToggleAllRows}
+              className="flex items-center gap-1.5 px-3 py-2 text-xs font-bold rounded-xl border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 hover:bg-cream-100 dark:hover:bg-sepia-800 text-sepia-750 dark:text-cream-200 transition-all cursor-pointer shadow-2xs shrink-0"
+              title={allRowsExpanded ? "Collapse all records" : "Expand all records"}
             >
-              <option value="All" className="bg-white dark:bg-sepia-900">All Categories</option>
-              {Object.keys(CATEGORY_METADATA).map((cat) => (
-                <option key={cat} value={cat} className="bg-white dark:bg-sepia-900">{cat}</option>
-              ))}
-            </select>
+              {allRowsExpanded ? (
+                <>
+                  <ChevronUp className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+                  <span>Collapse All</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+                  <span>Expand All</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
@@ -311,6 +358,20 @@ export const Vault: React.FC<VaultProps> = ({
             <table id="vault-table" className="w-full text-left border-collapse text-xs">
               <thead>
                 <tr className="bg-cream-50 dark:bg-sepia-800/40 text-sepia-500 dark:text-sepia-400 font-bold border-b border-cream-200 dark:border-sepia-850">
+                  <th className="p-3 w-10 text-center">
+                    <button
+                      type="button"
+                      onClick={handleToggleAllRows}
+                      className="p-1 rounded text-sepia-400 hover:text-readflow-green hover:bg-cream-150 dark:hover:bg-sepia-800 transition-all cursor-pointer"
+                      title={allRowsExpanded ? "Collapse all records on page" : "Expand all records on page"}
+                    >
+                      <ChevronRight
+                        className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                          allRowsExpanded ? 'rotate-90 text-readflow-green dark:text-readflow-lightgreen' : 'text-sepia-400'
+                        }`}
+                      />
+                    </button>
+                  </th>
                   <th className="p-3">Action</th>
                   <th className="p-3">Category</th>
                   <th className="p-3">Type</th>
@@ -322,7 +383,7 @@ export const Vault: React.FC<VaultProps> = ({
               <tbody className="divide-y divide-cream-100 dark:divide-sepia-800">
                 {paginatedOpps.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="p-8 text-center text-sepia-400 italic">
+                    <td colSpan={7} className="p-8 text-center text-sepia-400 italic">
                       No matching opportunity records found. Try modifying filters or search query.
                     </td>
                   </tr>
@@ -336,6 +397,7 @@ export const Vault: React.FC<VaultProps> = ({
                     if (isEditing) {
                       return (
                         <tr key={opp.id} className="bg-cream-50/70 dark:bg-sepia-800/20 border-l-2 border-readflow-green">
+                          <td className="p-2 w-10 text-center" />
                           <td className="p-2 space-y-2">
                             <div>
                               <label className="block text-[8px] font-mono font-bold text-sepia-400 uppercase">Action Title</label>
@@ -564,6 +626,26 @@ export const Vault: React.FC<VaultProps> = ({
                     return (
                       <React.Fragment key={opp.id}>
                         <tr className="hover:bg-cream-50/50 dark:hover:bg-sepia-800/10 transition-colors">
+                          <td className="p-3.5 align-top w-10 text-center">
+                            {hasVaultExpandedDetails ? (
+                              <button
+                                type="button"
+                                id={`vault-row-expand-arrow-${opp.id}`}
+                                onClick={() => handleToggleRowExpand(opp.id)}
+                                className="p-1 rounded text-sepia-400 hover:text-readflow-green hover:bg-cream-150 dark:hover:bg-sepia-800 transition-all cursor-pointer"
+                                title={Boolean(expandedRows[opp.id]) ? "Collapse details" : "Expand details"}
+                                aria-label={Boolean(expandedRows[opp.id]) ? "Collapse details" : "Expand details"}
+                              >
+                                <ChevronRight
+                                  className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                    Boolean(expandedRows[opp.id]) ? 'rotate-90 text-readflow-green dark:text-readflow-lightgreen' : 'text-sepia-400'
+                                  }`}
+                                />
+                              </button>
+                            ) : (
+                              <span className="w-3.5 h-3.5 inline-block" />
+                            )}
+                          </td>
                           <td className="p-3.5 align-top">
                             <div className="font-bold text-sepia-850 dark:text-cream-50 text-sm leading-snug">
                               {opp.title}
@@ -674,12 +756,12 @@ export const Vault: React.FC<VaultProps> = ({
                         </tr>
 
                         {/* Full-width Details & Scope in Vault */}
-                        {hasVaultExpandedDetails && (
+                        {Boolean(expandedRows[opp.id]) && hasVaultExpandedDetails && (
                           <tr
                             key={`${opp.id}-vault-expanded`}
                             className="hover:bg-cream-50/30 dark:hover:bg-sepia-800/10 transition-colors border-b border-cream-100 dark:border-sepia-800 !border-t-0"
                           >
-                            <td colSpan={6} className="px-3.5 pb-3 pt-0">
+                            <td colSpan={7} className="px-3.5 pb-3 pt-0">
                               <div className="space-y-2">
                                 {/* Checklists if any */}
                                 {hasVaultChecklists && (

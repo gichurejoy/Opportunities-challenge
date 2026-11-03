@@ -40,100 +40,6 @@ import { User, api, authStorage } from './utils/api';
 import { Sparkles, Trophy, Settings, Archive, Star, CheckCircle, Info, Sun, Moon, LayoutDashboard, ClipboardList, ListChecks, BellRing, Home, LogIn, LogOut, User as UserIcon, Cloud, Database, Printer, Award, HelpCircle, Wifi, WifiOff, RefreshCw, Smartphone, Search, FileSpreadsheet, Wand2, MoreHorizontal, ChevronDown, ChevronUp, ChevronRight, Calendar, GitBranch, Target, Flame, BarChart2, Plus } from 'lucide-react';
 
 
-interface CollapsibleDashboardCardProps {
-  id: string;
-  title: string;
-  subtitle?: string;
-  icon: React.ReactNode;
-  isCollapsed: boolean;
-  onToggle: () => void;
-  children: React.ReactNode;
-  className?: string;
-}
-
-function CollapsibleDashboardCard({
-  id,
-  title,
-  subtitle,
-  icon,
-  isCollapsed,
-  onToggle,
-  children,
-  className = '',
-}: CollapsibleDashboardCardProps) {
-  return (
-    <div id={`dashboard-card-${id}`} className={`transition-all duration-200 ${className}`}>
-      {isCollapsed ? (
-        <div
-          id={`collapsed-${id}-banner`}
-          onClick={onToggle}
-          className="bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-800 rounded-2xl px-5 py-3 shadow-2xs flex items-center justify-between cursor-pointer hover:border-readflow-green/50 dark:hover:border-readflow-lightgreen/50 hover:shadow-xs transition-all group"
-        >
-          <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-7 h-7 rounded-lg bg-cream-50 dark:bg-sepia-800 flex items-center justify-center text-readflow-green dark:text-readflow-lightgreen shrink-0 group-hover:scale-105 transition-transform">
-              {icon}
-            </div>
-            <span className="text-xs sm:text-sm font-serif font-bold text-sepia-900 dark:text-cream-100 group-hover:text-readflow-green dark:group-hover:text-readflow-lightgreen transition-colors truncate">
-              {title}
-            </span>
-            {subtitle && (
-              <span className="hidden sm:inline text-[10px] font-mono px-2 py-0.5 rounded-full bg-cream-100 dark:bg-sepia-800 text-sepia-500 dark:text-cream-300 shrink-0">
-                {subtitle}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 shrink-0">
-            <span className="text-[11px] font-bold text-readflow-green dark:text-readflow-lightgreen hidden sm:inline group-hover:underline">
-              Expand
-            </span>
-            <button
-              type="button"
-              id={`expand-arrow-${id}`}
-              onClick={(e) => {
-                e.stopPropagation();
-                onToggle();
-              }}
-              className="p-1 rounded-lg text-sepia-400 group-hover:text-readflow-green transition-colors cursor-pointer"
-              title={`Expand ${title}`}
-              aria-label={`Expand ${title}`}
-            >
-              <ChevronDown className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="space-y-1.5">
-          <div className="flex items-center justify-between px-2 pt-0.5">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <span className="text-[10px] font-mono font-bold text-sepia-400 dark:text-sepia-500 uppercase tracking-wider truncate flex items-center gap-1">
-                {icon}
-                <span>{title}</span>
-              </span>
-              {subtitle && (
-                <span className="hidden md:inline text-[9px] font-mono px-1.5 py-0.2 rounded bg-cream-100 dark:bg-sepia-800 text-sepia-400">
-                  {subtitle}
-                </span>
-              )}
-            </div>
-            <button
-              type="button"
-              id={`collapse-arrow-${id}`}
-              onClick={onToggle}
-              className="flex items-center gap-1 text-[10px] font-bold text-sepia-400 hover:text-sepia-700 dark:hover:text-cream-200 px-2 py-0.5 rounded-md hover:bg-cream-150 dark:hover:bg-sepia-800 transition-colors cursor-pointer shrink-0"
-              title={`Collapse ${title}`}
-              aria-label={`Collapse ${title}`}
-            >
-              <span>Collapse</span>
-              <ChevronUp className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
-            </button>
-          </div>
-          {children}
-        </div>
-      )}
-    </div>
-  );
-}
-
 
 export default function App() {
   const [state, setState] = useState<AppState | null>(null);
@@ -177,15 +83,9 @@ export default function App() {
   const DASHBOARD_SECTION_KEYS = [
     'catalyst',
     'deadlines',
-    'templates',
-    'logger',
-    'inspiration',
-    'heatmap',
-    'visions',
-    'streaks',
-    'analytics',
-    'review',
+    'grid',
     'pipeline',
+    'streaks',
     'vault',
   ];
 
@@ -1317,273 +1217,427 @@ export default function App() {
             </div>
 
             {/* 1. Full-Stack Catalyst */}
-            <CollapsibleDashboardCard
-              id="catalyst"
-              title='The "One More Opportunity" Catalyst'
-              subtitle="AI Suggestions"
-              icon={<Sparkles className="w-4 h-4 text-readflow-gold" />}
-              isCollapsed={Boolean(collapsedSections.catalyst)}
-              onToggle={() => toggleSectionCollapse('catalyst')}
-            >
-              <OneMoreButton
-                visions={state.visions}
-                recentOpportunities={state.opportunities}
-                onLogOpportunity={handleLogOpportunity}
-              />
-            </CollapsibleDashboardCard>
+            {collapsedSections.catalyst ? (
+              <div
+                id="collapsed-catalyst-banner"
+                onClick={() => toggleSectionCollapse('catalyst')}
+                className="bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-800 rounded-2xl px-5 py-3 shadow-2xs flex items-center justify-between cursor-pointer hover:border-readflow-green/50 dark:hover:border-readflow-lightgreen/50 transition-all group"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-cream-50 dark:bg-sepia-800 flex items-center justify-center text-readflow-gold shrink-0">
+                    <Sparkles className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm font-serif font-bold text-sepia-900 dark:text-cream-100 group-hover:text-readflow-green dark:group-hover:text-readflow-lightgreen transition-colors truncate">
+                    The "One More Opportunity" Catalyst
+                  </span>
+                  <span className="hidden sm:inline text-[10px] font-mono px-2 py-0.5 rounded-full bg-cream-100 dark:bg-sepia-800 text-sepia-500 dark:text-cream-300 shrink-0">
+                    AI Suggestions
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[11px] font-bold text-readflow-green dark:text-readflow-lightgreen hidden sm:inline">
+                    Expand
+                  </span>
+                  <button type="button" className="p-1 rounded-lg text-sepia-400 group-hover:text-readflow-green transition-colors cursor-pointer" title="Expand section">
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <section id="catalyst-section" className="relative group/section">
+                <div className="absolute right-3 top-3 z-10">
+                  <button
+                    type="button"
+                    id="collapse-btn-catalyst"
+                    onClick={() => toggleSectionCollapse('catalyst')}
+                    className="p-1.5 rounded-lg bg-cream-100/80 hover:bg-cream-200 dark:bg-sepia-800/80 dark:hover:bg-sepia-700 text-sepia-400 hover:text-sepia-800 dark:text-cream-300 transition-all cursor-pointer shadow-2xs flex items-center gap-1 text-[10px] font-bold"
+                    title="Collapse Catalyst section"
+                  >
+                    <span className="hidden sm:inline">Collapse</span>
+                    <ChevronUp className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+                  </button>
+                </div>
+                <OneMoreButton
+                  visions={state.visions}
+                  recentOpportunities={state.opportunities}
+                  onLogOpportunity={handleLogOpportunity}
+                />
+              </section>
+            )}
 
             {/* 2. Approaching Deadlines & Countdown Calendar */}
-            <CollapsibleDashboardCard
-              id="deadlines"
-              title="Approaching Deadlines & Calendar"
-              subtitle="Live Countdown & iCal"
-              icon={<Calendar className="w-4 h-4 text-amber-500" />}
-              isCollapsed={Boolean(collapsedSections.deadlines)}
-              onToggle={() => toggleSectionCollapse('deadlines')}
-            >
-              <DeadlineTracker
-                opportunities={state.opportunities}
-                onNavigateToLogbook={() => setCurrentView('logbook')}
-              />
-            </CollapsibleDashboardCard>
-
-            {/* 3 & 4. Dashboard Layout Grid (Quick Actions & Heatmap/Visions) */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-              {/* Block 1 (Quick Templates + Quick Logger + Inspiration Widget) */}
-              <div className="lg:col-span-1 flex flex-col gap-6">
-                <CollapsibleDashboardCard
-                  id="templates"
-                  title="Quick Launch Templates"
-                  subtitle="1-Click Presets"
-                  icon={<Wand2 className="w-4 h-4 text-readflow-green dark:text-readflow-lightgreen" />}
-                  isCollapsed={Boolean(collapsedSections.templates)}
-                  onToggle={() => toggleSectionCollapse('templates')}
-                >
-                  <QuickTemplates
-                    onLogOpportunity={(title, category, type, points) =>
-                      handleLogOpportunity({ title, category, type, points })
-                    }
-                  />
-                </CollapsibleDashboardCard>
-
-                <CollapsibleDashboardCard
-                  id="logger"
-                  title="Outbound Quick Logger"
-                  subtitle="Rapid Entry & Daily Habits"
-                  icon={<Plus className="w-4 h-4 text-readflow-green dark:text-readflow-lightgreen" />}
-                  isCollapsed={Boolean(collapsedSections.logger)}
-                  onToggle={() => toggleSectionCollapse('logger')}
-                >
-                  <QuickLogger
-                    scoreConfig={state.scoreConfig}
-                    onLogOpportunity={handleLogOpportunity}
-                    todayOpportunities={todayOpportunities}
-                    onDeleteOpportunity={handleDeleteOpportunity}
-                    visions={state.visions}
-                    checklistHabits={state.checklistHabits || []}
-                    onAddChecklistHabit={handleAddChecklistHabit}
-                    onDeleteChecklistHabit={handleDeleteChecklistHabit}
-                  />
-                </CollapsibleDashboardCard>
-
-                <CollapsibleDashboardCard
-                  id="inspiration"
-                  title="Daily Spark & Momentum"
-                  subtitle="Mindset Inspiration"
-                  icon={<Sparkles className="w-4 h-4 text-readflow-gold" />}
-                  isCollapsed={Boolean(collapsedSections.inspiration)}
-                  onToggle={() => toggleSectionCollapse('inspiration')}
-                >
-                  <Inspiration />
-                </CollapsibleDashboardCard>
-              </div>
-
-              {/* Block 2 (Heatmap Grid + Visions Roadmap) */}
-              <div className="lg:col-span-2 flex flex-col gap-6">
-                <CollapsibleDashboardCard
-                  id="heatmap"
-                  title="Opportunity Heatmap Matrix"
-                  subtitle="Consistency of Action"
-                  icon={<Calendar className="w-4 h-4 text-readflow-green dark:text-readflow-lightgreen" />}
-                  isCollapsed={Boolean(collapsedSections.heatmap)}
-                  onToggle={() => toggleSectionCollapse('heatmap')}
-                >
-                  <Heatmap opportunities={state.opportunities} />
-                </CollapsibleDashboardCard>
-
-                <CollapsibleDashboardCard
-                  id="visions"
-                  title="Vision Progress & Strategic Goals"
-                  subtitle="Long-Term Ambitions"
-                  icon={<Target className="w-4 h-4 text-readflow-gold" />}
-                  isCollapsed={Boolean(collapsedSections.visions)}
-                  onToggle={() => toggleSectionCollapse('visions')}
-                >
-                  <Visions
-                    visions={state.visions}
-                    opportunities={state.opportunities}
-                    onAddVision={handleAddVision}
-                    onDeleteVision={handleDeleteVision}
-                    onToggleComplete={handleToggleVisionComplete}
-                    onSelectVision={(id) => {
-                      setSelectedVisionId(id);
-                      setCurrentView('vision-details');
-                    }}
-                  />
-                </CollapsibleDashboardCard>
-              </div>
-            </div>
-
-            {/* 5. Discipline & Momentum Streaks */}
-            <CollapsibleDashboardCard
-              id="streaks"
-              title="Daily Discipline & Momentum Streaks"
-              subtitle="Active Habit Streaks"
-              icon={<Flame className="w-4 h-4 text-amber-500" />}
-              isCollapsed={Boolean(collapsedSections.streaks)}
-              onToggle={() => toggleSectionCollapse('streaks')}
-            >
-              <Streaks
-                streaks={state.streaks}
-                streakStates={state.streakStates}
-                onToggleStreakActive={handleToggleStreakActive}
-              />
-            </CollapsibleDashboardCard>
-
-            {/* 6. Dashboard Row 2: Analytics, Review, & Pipelines */}
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                <div className="lg:col-span-2">
-                  <CollapsibleDashboardCard
-                    id="analytics"
-                    title="Opportunity Analytics & Conversion Funnel"
-                    subtitle="Category Breakdown"
-                    icon={<BarChart2 className="w-4 h-4 text-readflow-green dark:text-readflow-lightgreen" />}
-                    isCollapsed={Boolean(collapsedSections.analytics)}
-                    onToggle={() => toggleSectionCollapse('analytics')}
-                  >
-                    <Analytics opportunities={state.opportunities} pipelines={state.pipelines} />
-                  </CollapsibleDashboardCard>
+            {collapsedSections.deadlines ? (
+              <div
+                id="collapsed-deadlines-banner"
+                onClick={() => toggleSectionCollapse('deadlines')}
+                className="bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-800 rounded-2xl px-5 py-3 shadow-2xs flex items-center justify-between cursor-pointer hover:border-readflow-green/50 dark:hover:border-readflow-lightgreen/50 transition-all group"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-cream-50 dark:bg-sepia-800 flex items-center justify-center text-amber-500 shrink-0">
+                    <Calendar className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm font-serif font-bold text-sepia-900 dark:text-cream-100 group-hover:text-readflow-green dark:group-hover:text-readflow-lightgreen transition-colors truncate">
+                    Approaching Deadlines & Calendar
+                  </span>
+                  <span className="hidden sm:inline text-[10px] font-mono px-2 py-0.5 rounded-full bg-cream-100 dark:bg-sepia-800 text-sepia-500 dark:text-cream-300 shrink-0">
+                    Live Countdown & iCal
+                  </span>
                 </div>
-                <div className="lg:col-span-1">
-                  <CollapsibleDashboardCard
-                    id="review"
-                    title="Weekly Review & Reflection"
-                    subtitle="Targets & Cadence"
-                    icon={<Sparkles className="w-4 h-4 text-readflow-gold" />}
-                    isCollapsed={Boolean(collapsedSections.review)}
-                    onToggle={() => toggleSectionCollapse('review')}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[11px] font-bold text-readflow-green dark:text-readflow-lightgreen hidden sm:inline">
+                    Expand
+                  </span>
+                  <button type="button" className="p-1 rounded-lg text-sepia-400 group-hover:text-readflow-green transition-colors cursor-pointer" title="Expand section">
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <section id="deadlines-section" className="relative group/section">
+                <div className="absolute right-3 top-3 z-10">
+                  <button
+                    type="button"
+                    id="collapse-btn-deadlines"
+                    onClick={() => toggleSectionCollapse('deadlines')}
+                    className="p-1.5 rounded-lg bg-cream-100/80 hover:bg-cream-200 dark:bg-sepia-800/80 dark:hover:bg-sepia-700 text-sepia-400 hover:text-sepia-800 dark:text-cream-300 transition-all cursor-pointer shadow-2xs flex items-center gap-1 text-[10px] font-bold"
+                    title="Collapse Deadlines section"
                   >
+                    <span className="hidden sm:inline">Collapse</span>
+                    <ChevronUp className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+                  </button>
+                </div>
+                <DeadlineTracker
+                  opportunities={state.opportunities}
+                  onNavigateToLogbook={() => setCurrentView('logbook')}
+                />
+              </section>
+            )}
+
+            {/* 3. Dashboard Layout Grid (Quick Actions & Heatmap/Visions) */}
+            {collapsedSections.grid ? (
+              <div
+                id="collapsed-grid-banner"
+                onClick={() => toggleSectionCollapse('grid')}
+                className="bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-800 rounded-2xl px-5 py-3 shadow-2xs flex items-center justify-between cursor-pointer hover:border-readflow-green/50 dark:hover:border-readflow-lightgreen/50 transition-all group"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-cream-50 dark:bg-sepia-800 flex items-center justify-center text-readflow-green shrink-0">
+                    <LayoutDashboard className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm font-serif font-bold text-sepia-900 dark:text-cream-100 group-hover:text-readflow-green dark:group-hover:text-readflow-lightgreen transition-colors truncate">
+                    Daily Logging, Templates, Heatmap & Strategic Visions Grid
+                  </span>
+                  <span className="hidden sm:inline text-[10px] font-mono px-2 py-0.5 rounded-full bg-cream-100 dark:bg-sepia-800 text-sepia-500 dark:text-cream-300 shrink-0">
+                    Outbound & Velocity
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[11px] font-bold text-readflow-green dark:text-readflow-lightgreen hidden sm:inline">
+                    Expand
+                  </span>
+                  <button type="button" className="p-1 rounded-lg text-sepia-400 group-hover:text-readflow-green transition-colors cursor-pointer" title="Expand section">
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-[10px] font-mono font-bold text-sepia-400 dark:text-sepia-500 uppercase tracking-wider">
+                    Daily Logging & Strategic Visions Grid
+                  </span>
+                  <button
+                    type="button"
+                    id="collapse-btn-grid"
+                    onClick={() => toggleSectionCollapse('grid')}
+                    className="flex items-center gap-1 text-[10px] font-bold text-sepia-400 hover:text-sepia-700 dark:hover:text-cream-200 px-1.5 py-0.5 rounded hover:bg-cream-150 dark:hover:bg-sepia-800 transition-colors cursor-pointer"
+                    title="Collapse Logging & Visions Grid"
+                  >
+                    <span>Collapse</span>
+                    <ChevronUp className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+                  </button>
+                </div>
+                <section id="dashboard-grid" className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                  {/* Block 1 (Quick Templates + Quick Logger + Inspiration Widget) */}
+                  <div className="lg:col-span-1 flex flex-col gap-6">
+                    <QuickTemplates
+                      onLogOpportunity={(title, category, type, points) =>
+                        handleLogOpportunity({ title, category, type, points })
+                      }
+                    />
+                    <QuickLogger
+                      scoreConfig={state.scoreConfig}
+                      onLogOpportunity={handleLogOpportunity}
+                      todayOpportunities={todayOpportunities}
+                      onDeleteOpportunity={handleDeleteOpportunity}
+                      visions={state.visions}
+                      checklistHabits={state.checklistHabits || []}
+                      onAddChecklistHabit={handleAddChecklistHabit}
+                      onDeleteChecklistHabit={handleDeleteChecklistHabit}
+                    />
+                    <Inspiration />
+                  </div>
+
+                  {/* Block 2 (Heatmap Grid + Visions Roadmap) */}
+                  <div className="lg:col-span-2 flex flex-col gap-6">
+                    <Heatmap opportunities={state.opportunities} />
+                    
+                    <Visions
+                      visions={state.visions}
+                      opportunities={state.opportunities}
+                      onAddVision={handleAddVision}
+                      onDeleteVision={handleDeleteVision}
+                      onToggleComplete={handleToggleVisionComplete}
+                      onSelectVision={(id) => {
+                        setSelectedVisionId(id);
+                        setCurrentView('vision-details');
+                      }}
+                    />
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {/* 4. Dashboard Row 2: Analytics, Review, & Pipelines */}
+            {collapsedSections.pipeline ? (
+              <div
+                id="collapsed-pipeline-banner"
+                onClick={() => toggleSectionCollapse('pipeline')}
+                className="bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-800 rounded-2xl px-5 py-3 shadow-2xs flex items-center justify-between cursor-pointer hover:border-readflow-green/50 dark:hover:border-readflow-lightgreen/50 transition-all group"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-cream-50 dark:bg-sepia-800 flex items-center justify-center text-readflow-green shrink-0">
+                    <GitBranch className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm font-serif font-bold text-sepia-900 dark:text-cream-100 group-hover:text-readflow-green dark:group-hover:text-readflow-lightgreen transition-colors truncate">
+                    Analytics, Weekly Review & Opportunity Pipeline Kanban
+                  </span>
+                  <span className="hidden sm:inline text-[10px] font-mono px-2 py-0.5 rounded-full bg-cream-100 dark:bg-sepia-800 text-sepia-500 dark:text-cream-300 shrink-0">
+                    Funnel & Kanban
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[11px] font-bold text-readflow-green dark:text-readflow-lightgreen hidden sm:inline">
+                    Expand
+                  </span>
+                  <button type="button" className="p-1 rounded-lg text-sepia-400 group-hover:text-readflow-green transition-colors cursor-pointer" title="Expand section">
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-[10px] font-mono font-bold text-sepia-400 dark:text-sepia-500 uppercase tracking-wider">
+                    Analytics, Reviews & Pipeline Kanban
+                  </span>
+                  <button
+                    type="button"
+                    id="collapse-btn-pipeline"
+                    onClick={() => toggleSectionCollapse('pipeline')}
+                    className="flex items-center gap-1 text-[10px] font-bold text-sepia-400 hover:text-sepia-700 dark:hover:text-cream-200 px-1.5 py-0.5 rounded hover:bg-cream-150 dark:hover:bg-sepia-800 transition-colors cursor-pointer"
+                    title="Collapse Pipeline & Analytics"
+                  >
+                    <span>Collapse</span>
+                    <ChevronUp className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+                  </button>
+                </div>
+                <section id="secondary-dashboard-grid" className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+                  {/* Analytics & Weekly Review block */}
+                  <div className="lg:col-span-1 flex flex-col gap-6">
+                    <Analytics opportunities={state.opportunities} pipelines={state.pipelines} />
                     <WeeklyReview 
                       opportunities={state.opportunities} 
                       weeklyTargets={state.weeklyTargets || []}
                       onUpdateWeeklyTarget={handleUpdateWeeklyTarget}
                     />
-                  </CollapsibleDashboardCard>
-                </div>
-              </div>
+                  </div>
 
-              <CollapsibleDashboardCard
-                id="pipeline"
-                title="Opportunity Pipeline Kanban Board"
-                subtitle="Stage Progression Tracker"
-                icon={<GitBranch className="w-4 h-4 text-readflow-green dark:text-readflow-lightgreen" />}
-                isCollapsed={Boolean(collapsedSections.pipeline)}
-                onToggle={() => toggleSectionCollapse('pipeline')}
-              >
-                <Pipeline
-                  pipelines={state.pipelines}
-                  opportunities={state.opportunities}
-                  onAddPipeline={handleAddPipeline}
-                  onUpdatePipeline={handleUpdatePipeline}
-                  onDeletePipeline={handleDeletePipeline}
-                  onUpdateOpportunity={handleUpdateOpportunity}
-                  activePipelineId={activePipelineId}
-                  onSelectPipeline={setActivePipelineId}
-                />
-              </CollapsibleDashboardCard>
-            </div>
-
-            {/* 7. Bottom Drawer Tabs: Saved Records and Settings Config */}
-            <CollapsibleDashboardCard
-              id="vault"
-              title="Opportunity History, Scoring Settings & Momentum Nudges Drawer"
-              subtitle="Vault & Backup"
-              icon={<Archive className="w-4 h-4 text-readflow-olive" />}
-              isCollapsed={Boolean(collapsedSections.vault)}
-              onToggle={() => toggleSectionCollapse('vault')}
-            >
-              <div className="w-full bg-white dark:bg-sepia-900 rounded-2xl border border-cream-200 dark:border-sepia-800 overflow-hidden shadow-sm transition-all duration-300">
-                {/* Toggle buttons */}
-                <div className="flex border-b border-cream-150 dark:border-sepia-800 bg-cream-50/50 dark:bg-sepia-900/60 p-2 gap-2">
-                  <button
-                    id="drawer-tab-vault"
-                    onClick={() => setActiveBottomTab('vault')}
-                    className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      activeBottomTab === 'vault'
-                        ? 'bg-readflow-green dark:bg-readflow-olive text-cream-100 font-extrabold shadow'
-                        : 'text-sepia-400 hover:text-sepia-700 dark:text-sepia-300'
-                    }`}
-                  >
-                    <Archive className="w-3.5 h-3.5" />
-                    Opportunity History & Backup
-                  </button>
-                  <button
-                    id="drawer-tab-settings"
-                    onClick={() => setActiveBottomTab('settings')}
-                    className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      activeBottomTab === 'settings'
-                        ? 'bg-readflow-green dark:bg-readflow-olive text-cream-100 font-extrabold shadow'
-                        : 'text-sepia-400 hover:text-sepia-700 dark:text-sepia-300'
-                    }`}
-                  >
-                    <Settings className="w-3.5 h-3.5" />
-                    Configure Opportunity Scores
-                  </button>
-                  <button
-                    id="drawer-tab-nudge"
-                    onClick={() => setActiveBottomTab('nudge')}
-                    className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
-                      activeBottomTab === 'nudge'
-                        ? 'bg-readflow-green dark:bg-readflow-olive text-cream-100 font-extrabold shadow'
-                        : 'text-sepia-400 hover:text-sepia-700 dark:text-sepia-300'
-                    }`}
-                  >
-                    <BellRing className="w-3.5 h-3.5" />
-                    Momentum Nudges
-                    {state.nudgeConfig?.enabled && (
-                      <span className="w-2 h-2 rounded-full bg-readflow-green dark:bg-readflow-lightgreen animate-pulse ml-1 shrink-0" />
-                    )}
-                  </button>
-                </div>
-
-                {/* Active drawer pane */}
-                <div className="p-1 w-full">
-                  {activeBottomTab === 'vault' ? (
-                    <Vault
+                  {/* Pipeline stages tracker */}
+                  <div className="lg:col-span-2" id="pipeline-panel">
+                    <Pipeline
+                      pipelines={state.pipelines}
                       opportunities={state.opportunities}
-                      checklistHabits={state.checklistHabits || []}
-                      onImportVault={handleImportVault}
-                      onClearVault={handleClearVault}
-                      onDeleteOpportunity={handleDeleteOpportunity}
+                      onAddPipeline={handleAddPipeline}
+                      onUpdatePipeline={handleUpdatePipeline}
+                      onDeletePipeline={handleDeletePipeline}
                       onUpdateOpportunity={handleUpdateOpportunity}
+                      activePipelineId={activePipelineId}
+                      onSelectPipeline={setActivePipelineId}
                     />
-                  ) : activeBottomTab === 'settings' ? (
-                    <ScoreSettings
-                      scoreConfig={state.scoreConfig}
-                      onUpdateScoreConfig={handleUpdateScoreConfig}
-                      onResetScores={handleResetScores}
-                    />
-                  ) : (
-                    <NudgeSettings
-                      nudgeConfig={state.nudgeConfig || { enabled: true, soundEnabled: true, browserNotificationsEnabled: false, schedules: [], history: [] }}
-                      onUpdateNudgeConfig={handleUpdateNudgeConfig}
-                      onTriggerTestNudge={handleTriggerTestNudge}
-                    />
-                  )}
+                  </div>
+                </section>
+              </div>
+            )}
+
+            {/* 5. Consistency Streaks Section */}
+            {collapsedSections.streaks ? (
+              <div
+                id="collapsed-streaks-banner"
+                onClick={() => toggleSectionCollapse('streaks')}
+                className="bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-800 rounded-2xl px-5 py-3 shadow-2xs flex items-center justify-between cursor-pointer hover:border-readflow-green/50 dark:hover:border-readflow-lightgreen/50 transition-all group"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-cream-50 dark:bg-sepia-800 flex items-center justify-center text-amber-500 shrink-0">
+                    <Award className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm font-serif font-bold text-sepia-900 dark:text-cream-100 group-hover:text-readflow-green dark:group-hover:text-readflow-lightgreen transition-colors truncate">
+                    Daily Discipline & Momentum Streaks
+                  </span>
+                  <span className="hidden sm:inline text-[10px] font-mono px-2 py-0.5 rounded-full bg-cream-100 dark:bg-sepia-800 text-sepia-500 dark:text-cream-300 shrink-0">
+                    Habit Streaks
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[11px] font-bold text-readflow-green dark:text-readflow-lightgreen hidden sm:inline">
+                    Expand
+                  </span>
+                  <button type="button" className="p-1 rounded-lg text-sepia-400 group-hover:text-readflow-green transition-colors cursor-pointer" title="Expand section">
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-            </CollapsibleDashboardCard>
+            ) : (
+              <section id="streaks-section" className="space-y-1">
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-[10px] font-mono font-bold text-sepia-400 dark:text-sepia-500 uppercase tracking-wider">
+                    Consistency Streaks
+                  </span>
+                  <button
+                    type="button"
+                    id="collapse-btn-streaks"
+                    onClick={() => toggleSectionCollapse('streaks')}
+                    className="flex items-center gap-1 text-[10px] font-bold text-sepia-400 hover:text-sepia-700 dark:hover:text-cream-200 px-1.5 py-0.5 rounded hover:bg-cream-150 dark:hover:bg-sepia-800 transition-colors cursor-pointer"
+                    title="Collapse Streaks section"
+                  >
+                    <span>Collapse</span>
+                    <ChevronUp className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+                  </button>
+                </div>
+                <Streaks
+                  streaks={state.streaks}
+                  streakStates={state.streakStates}
+                  onToggleStreakActive={handleToggleStreakActive}
+                />
+              </section>
+            )}
+
+            {/* 6. Bottom Drawer Tabs: Saved Records and Settings Config */}
+            {collapsedSections.vault ? (
+              <div
+                id="collapsed-vault-banner"
+                onClick={() => toggleSectionCollapse('vault')}
+                className="bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-800 rounded-2xl px-5 py-3 shadow-2xs flex items-center justify-between cursor-pointer hover:border-readflow-green/50 dark:hover:border-readflow-lightgreen/50 transition-all group"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-cream-50 dark:bg-sepia-800 flex items-center justify-center text-readflow-olive shrink-0">
+                    <Archive className="w-4 h-4" />
+                  </div>
+                  <span className="text-sm font-serif font-bold text-sepia-900 dark:text-cream-100 group-hover:text-readflow-green dark:group-hover:text-readflow-lightgreen transition-colors truncate">
+                    Opportunity History, Scoring Settings & Momentum Nudges Drawer
+                  </span>
+                  <span className="hidden sm:inline text-[10px] font-mono px-2 py-0.5 rounded-full bg-cream-100 dark:bg-sepia-800 text-sepia-500 dark:text-cream-300 shrink-0">
+                    Vault & Backup
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <span className="text-[11px] font-bold text-readflow-green dark:text-readflow-lightgreen hidden sm:inline">
+                    Expand
+                  </span>
+                  <button type="button" className="p-1 rounded-lg text-sepia-400 group-hover:text-readflow-green transition-colors cursor-pointer" title="Expand section">
+                    <ChevronDown className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <section id="drawer-section" className="space-y-1">
+                <div className="flex items-center justify-between px-2">
+                  <span className="text-[10px] font-mono font-bold text-sepia-400 dark:text-sepia-500 uppercase tracking-wider">
+                    Data Vault & Settings
+                  </span>
+                  <button
+                    type="button"
+                    id="collapse-btn-vault"
+                    onClick={() => toggleSectionCollapse('vault')}
+                    className="flex items-center gap-1 text-[10px] font-bold text-sepia-400 hover:text-sepia-700 dark:hover:text-cream-200 px-1.5 py-0.5 rounded hover:bg-cream-150 dark:hover:bg-sepia-800 transition-colors cursor-pointer"
+                    title="Collapse Vault & Settings section"
+                  >
+                    <span>Collapse</span>
+                    <ChevronUp className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+                  </button>
+                </div>
+                <div className="w-full bg-white dark:bg-sepia-900 rounded-2xl border border-cream-200 dark:border-sepia-800 overflow-hidden shadow-sm transition-all duration-300">
+                  {/* Toggle buttons */}
+                  <div className="flex border-b border-cream-150 dark:border-sepia-800 bg-cream-50/50 dark:bg-sepia-900/60 p-2 gap-2">
+                    <button
+                      id="drawer-tab-vault"
+                      onClick={() => setActiveBottomTab('vault')}
+                      className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        activeBottomTab === 'vault'
+                          ? 'bg-readflow-green dark:bg-readflow-olive text-cream-100 font-extrabold shadow'
+                          : 'text-sepia-400 hover:text-sepia-700 dark:text-sepia-300'
+                      }`}
+                    >
+                      <Archive className="w-3.5 h-3.5" />
+                      Opportunity History & Backup
+                    </button>
+                    <button
+                      id="drawer-tab-settings"
+                      onClick={() => setActiveBottomTab('settings')}
+                      className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        activeBottomTab === 'settings'
+                          ? 'bg-readflow-green dark:bg-readflow-olive text-cream-100 font-extrabold shadow'
+                          : 'text-sepia-400 hover:text-sepia-700 dark:text-sepia-300'
+                      }`}
+                    >
+                      <Settings className="w-3.5 h-3.5" />
+                      Configure Opportunity Scores
+                    </button>
+                    <button
+                      id="drawer-tab-nudge"
+                      onClick={() => setActiveBottomTab('nudge')}
+                      className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                        activeBottomTab === 'nudge'
+                          ? 'bg-readflow-green dark:bg-readflow-olive text-cream-100 font-extrabold shadow'
+                          : 'text-sepia-400 hover:text-sepia-700 dark:text-sepia-300'
+                      }`}
+                    >
+                      <BellRing className="w-3.5 h-3.5" />
+                      Momentum Nudges
+                      {state.nudgeConfig?.enabled && (
+                        <span className="w-2 h-2 rounded-full bg-readflow-green dark:bg-readflow-lightgreen animate-pulse ml-1 shrink-0" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* Active drawer pane */}
+                  <div className="p-1 w-full">
+                    {activeBottomTab === 'vault' ? (
+                      <Vault
+                        opportunities={state.opportunities}
+                        checklistHabits={state.checklistHabits || []}
+                        onImportVault={handleImportVault}
+                        onClearVault={handleClearVault}
+                        onDeleteOpportunity={handleDeleteOpportunity}
+                        onUpdateOpportunity={handleUpdateOpportunity}
+                      />
+                    ) : activeBottomTab === 'settings' ? (
+                      <ScoreSettings
+                        scoreConfig={state.scoreConfig}
+                        onUpdateScoreConfig={handleUpdateScoreConfig}
+                        onResetScores={handleResetScores}
+                      />
+                    ) : (
+                      <NudgeSettings
+                        nudgeConfig={state.nudgeConfig || { enabled: true, soundEnabled: true, browserNotificationsEnabled: false, schedules: [], history: [] }}
+                        onUpdateNudgeConfig={handleUpdateNudgeConfig}
+                        onTriggerTestNudge={handleTriggerTestNudge}
+                      />
+                    )}
+                  </div>
+                </div>
+              </section>
+            )}
           </>
         ) : currentView === 'checklist' ? (
           <ChecklistGrid
