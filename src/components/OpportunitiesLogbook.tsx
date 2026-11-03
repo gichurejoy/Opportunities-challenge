@@ -751,6 +751,27 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
     }
   };
 
+  // Check if all visible rows are expanded
+  const allRowsExpanded = paginatedOpps.length > 0 && paginatedOpps.every((opp) => Boolean(expandedRows[opp.id]));
+
+  const handleToggleAllRows = () => {
+    if (allRowsExpanded) {
+      // Collapse all
+      const nextState: Record<string, boolean> = {};
+      paginatedOpps.forEach((o) => {
+        nextState[o.id] = false;
+      });
+      setExpandedRows((prev) => ({ ...prev, ...nextState }));
+    } else {
+      // Expand all
+      const nextState: Record<string, boolean> = {};
+      paginatedOpps.forEach((o) => {
+        nextState[o.id] = true;
+      });
+      setExpandedRows((prev) => ({ ...prev, ...nextState }));
+    }
+  };
+
   const handleSelectRowTab = (oppId: string, tab: 'details' | 'timeline') => {
     setActiveTabMap((prev) => ({ ...prev, [oppId]: tab }));
     setExpandedRows((prev) => ({ ...prev, [oppId]: true }));
@@ -1110,19 +1131,69 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
 
       {/* Main Table Logbook Card */}
       <div className="bg-white dark:bg-sepia-900 border border-cream-200 dark:border-sepia-800 rounded-2xl shadow-sm overflow-hidden">
+        {/* Table Controls Sub-header */}
+        <div className="px-5 py-2.5 border-b border-cream-150 dark:border-sepia-800 bg-cream-50/40 dark:bg-sepia-850/60 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-sepia-700 dark:text-cream-200 font-mono">
+              Showing {sortedOpps.length > 0 ? startIndex + 1 : 0}-{Math.min(startIndex + ITEMS_PER_PAGE, sortedOpps.length)} of {sortedOpps.length} Opportunities
+            </span>
+            {paginatedOpps.some((o) => Boolean(expandedRows[o.id])) && (
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-readflow-green/10 text-readflow-green dark:text-readflow-lightgreen font-bold">
+                {paginatedOpps.filter((o) => Boolean(expandedRows[o.id])).length} expanded
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              id="logbook-toggle-all-expand-btn"
+              onClick={handleToggleAllRows}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold rounded-lg border border-cream-200 dark:border-sepia-800 bg-white dark:bg-sepia-900 hover:bg-cream-100 dark:hover:bg-sepia-800 text-sepia-750 dark:text-cream-200 transition-all cursor-pointer shadow-2xs"
+              title={allRowsExpanded ? "Collapse all rows on this page" : "Expand all rows on this page"}
+            >
+              {allRowsExpanded ? (
+                <>
+                  <ChevronUp className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+                  <span>Collapse All</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+                  <span>Expand All</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="bg-cream-50/60 dark:bg-sepia-850 border-b border-cream-150 dark:border-sepia-800 text-sepia-500 dark:text-cream-300 font-bold uppercase tracking-wider font-mono">
-                <th className="p-4 w-10 text-center">
-                  <input
-                    type="checkbox"
-                    id="select-all-opps-checkbox"
-                    checked={isAllPageSelected}
-                    onChange={handleToggleSelectAll}
-                    className="w-4 h-4 rounded border-cream-300 dark:border-sepia-700 text-readflow-green focus:ring-readflow-green cursor-pointer accent-readflow-green"
-                    title="Select all on this page"
-                  />
+                <th className="p-3.5 w-14 text-center">
+                  <div className="flex items-center justify-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={handleToggleAllRows}
+                      className="p-1 rounded-md text-sepia-400 hover:text-readflow-green hover:bg-cream-150 dark:hover:bg-sepia-800 transition-all cursor-pointer"
+                      title={allRowsExpanded ? "Collapse all rows on page" : "Expand all rows on page"}
+                    >
+                      <ChevronRight
+                        className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                          allRowsExpanded ? 'rotate-90 text-readflow-green dark:text-readflow-lightgreen' : 'text-sepia-400'
+                        }`}
+                      />
+                    </button>
+                    <input
+                      type="checkbox"
+                      id="select-all-opps-checkbox"
+                      checked={isAllPageSelected}
+                      onChange={handleToggleSelectAll}
+                      className="w-4 h-4 rounded border-cream-300 dark:border-sepia-700 text-readflow-green focus:ring-readflow-green cursor-pointer accent-readflow-green"
+                      title="Select all on this page"
+                    />
+                  </div>
                 </th>
                 <th className="p-4">Opportunity details</th>
                 <th className="p-4">Category</th>
@@ -1461,7 +1532,7 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                         },
                       ];
 
-                  const isRowExpanded = expandedRows[opp.id] ?? hasExpandedDetails;
+                  const isRowExpanded = Boolean(expandedRows[opp.id]);
                   const currentTab = activeTabMap[opp.id] || (hasExpandedDetails ? 'details' : 'timeline');
 
                   return (
@@ -1471,15 +1542,31 @@ export const OpportunitiesLogbook: React.FC<OpportunitiesLogbookProps> = ({
                           isRowExpanded ? 'border-b-0' : ''
                         } ${selectedOppIds.includes(opp.id) ? 'bg-readflow-green/10 dark:bg-readflow-green/15' : ''}`}
                       >
-                        {/* Checkbox column */}
-                        <td className="p-4 align-top text-center w-10">
-                          <input
-                            type="checkbox"
-                            id={`select-opp-${opp.id}`}
-                            checked={selectedOppIds.includes(opp.id)}
-                            onChange={() => handleToggleSelectOne(opp.id)}
-                            className="w-4 h-4 rounded border-cream-300 dark:border-sepia-700 text-readflow-green focus:ring-readflow-green cursor-pointer accent-readflow-green"
-                          />
+                        {/* Expand arrow & Checkbox column */}
+                        <td className="p-3.5 align-top w-14">
+                          <div className="flex items-center justify-center gap-1.5 pt-0.5">
+                            <button
+                              type="button"
+                              id={`row-expand-arrow-${opp.id}`}
+                              onClick={() => handleToggleRowExpand(opp.id)}
+                              className="p-1 rounded-md text-sepia-400 hover:text-readflow-green hover:bg-cream-150 dark:hover:bg-sepia-800 transition-all cursor-pointer"
+                              title={isRowExpanded ? "Collapse row details" : "Expand row details"}
+                              aria-label={isRowExpanded ? "Collapse row details" : "Expand row details"}
+                            >
+                              <ChevronRight
+                                className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                                  isRowExpanded ? 'rotate-90 text-readflow-green dark:text-readflow-lightgreen' : 'text-sepia-400'
+                                }`}
+                              />
+                            </button>
+                            <input
+                              type="checkbox"
+                              id={`select-opp-${opp.id}`}
+                              checked={selectedOppIds.includes(opp.id)}
+                              onChange={() => handleToggleSelectOne(opp.id)}
+                              className="w-4 h-4 rounded border-cream-300 dark:border-sepia-700 text-readflow-green focus:ring-readflow-green cursor-pointer accent-readflow-green"
+                            />
+                          </div>
                         </td>
 
                         {/* Details Column */}
