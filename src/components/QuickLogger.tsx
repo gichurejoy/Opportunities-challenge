@@ -24,7 +24,9 @@ import {
   ListChecks,
   Calendar,
   Tag,
-  X
+  X,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { Opportunity, ScoreConfig, Vision, ChecklistHabit, textToChecklistItems } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
@@ -102,6 +104,7 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
   // Multi-tagging states
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [customTagInput, setCustomTagInput] = useState<string>('');
+  const [isFeedCollapsed, setIsFeedCollapsed] = useState<boolean>(false);
 
   const handleToggleTag = (tag: string) => {
     const clean = tag.trim().startsWith('#') ? tag.trim() : `#${tag.trim()}`;
@@ -929,55 +932,77 @@ export const QuickLogger: React.FC<QuickLoggerProps> = ({
         )}
 
         {/* Today's logged sub-list */}
-        <div className="mt-5 pt-4 border-t border-cream-100 dark:border-sepia-800 flex-initial flex flex-col min-h-[140px] max-h-[340px]">
-          <h3 className="text-xs font-serif font-bold text-sepia-500 dark:text-sepia-400 mb-2 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5 text-readflow-gold" />
-            Today's Feed List
-          </h3>
-          <div className="flex-1 overflow-y-auto pr-1 space-y-1.5">
-            {todayOpportunities.filter(opp => !opp.isChecklist).length === 0 ? (
-              <div className="text-center py-6 text-sepia-400 dark:text-sepia-500 text-xs flex flex-col items-center justify-center h-full font-serif italic">
-                <span>0 achievements logged today.</span>
-                <span className="text-[10px] mt-1 font-sans not-italic">The future is created one small action at a time.</span>
-              </div>
-            ) : (
-              <AnimatePresence initial={false}>
-                {todayOpportunities.filter(opp => !opp.isChecklist).map((opp) => {
-                  const meta = CATEGORY_METADATA[opp.category] || CATEGORY_METADATA.Career;
-                  const Icon = meta.icon;
-                  return (
-                    <motion.div
-                      key={opp.id}
-                      initial={{ opacity: 0, y: -5 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
-                      className="flex items-center justify-between p-3 rounded-xl bg-cream-50/50 dark:bg-sepia-800/20 border border-cream-150 dark:border-sepia-800/40 text-[11px]"
-                    >
-                      <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
-                        <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: meta.color }} />
-                        <span className="text-sepia-750 dark:text-cream-100 font-medium truncate font-sans">
-                          {opp.title}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="font-mono font-bold text-readflow-green dark:text-readflow-lightgreen">
-                          +{opp.points}
-                        </span>
-                        <button
-                          id={`del-opp-btn-${opp.id}`}
-                          onClick={() => onDeleteOpportunity(opp.id)}
-                          className="text-sepia-300 hover:text-red-500 p-0.5 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all cursor-pointer animate-none"
-                          title="Delete opportunity"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                    </motion.div>
-                  );
-                })}
-              </AnimatePresence>
-            )}
+        <div className="mt-5 pt-4 border-t border-cream-100 dark:border-sepia-800 flex-initial flex flex-col">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="text-xs font-serif font-bold text-sepia-600 dark:text-sepia-300 flex items-center gap-1.5">
+              <CheckCircle2 className="w-3.5 h-3.5 text-readflow-gold" />
+              <span>Today's Feed List</span>
+              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-cream-150 dark:bg-sepia-800 text-sepia-500 dark:text-cream-300 font-bold">
+                {todayOpportunities.filter(opp => !opp.isChecklist).length}
+              </span>
+            </h3>
+            <button
+              type="button"
+              id="toggle-feed-collapse-btn"
+              onClick={() => setIsFeedCollapsed((prev) => !prev)}
+              className="flex items-center gap-1 text-[10px] font-bold text-sepia-400 hover:text-sepia-700 dark:hover:text-cream-200 px-1.5 py-0.5 rounded hover:bg-cream-150 dark:hover:bg-sepia-800 transition-colors cursor-pointer"
+              title={isFeedCollapsed ? "Expand Today's Feed List" : "Collapse Today's Feed List"}
+            >
+              <span>{isFeedCollapsed ? 'Expand' : 'Collapse'}</span>
+              {isFeedCollapsed ? (
+                <ChevronDown className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+              ) : (
+                <ChevronUp className="w-3.5 h-3.5 text-readflow-green dark:text-readflow-lightgreen" />
+              )}
+            </button>
           </div>
+
+          {!isFeedCollapsed && (
+            <div className="flex-1 overflow-y-auto pr-1 space-y-1.5 min-h-[100px] max-h-[300px]">
+              {todayOpportunities.filter(opp => !opp.isChecklist).length === 0 ? (
+                <div className="text-center py-6 text-sepia-400 dark:text-sepia-500 text-xs flex flex-col items-center justify-center h-full font-serif italic">
+                  <span>0 achievements logged today.</span>
+                  <span className="text-[10px] mt-1 font-sans not-italic">The future is created one small action at a time.</span>
+                </div>
+              ) : (
+                <AnimatePresence initial={false}>
+                  {todayOpportunities.filter(opp => !opp.isChecklist).map((opp) => {
+                    const meta = CATEGORY_METADATA[opp.category] || CATEGORY_METADATA.Career;
+                    const Icon = meta.icon;
+                    return (
+                      <motion.div
+                        key={opp.id}
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, x: -10 }}
+                        className="flex items-center justify-between p-3 rounded-xl bg-cream-50/50 dark:bg-sepia-800/20 border border-cream-150 dark:border-sepia-800/40 text-[11px]"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1 mr-2">
+                          <Icon className="w-3.5 h-3.5 shrink-0" style={{ color: meta.color }} />
+                          <span className="text-sepia-750 dark:text-cream-100 font-medium truncate font-sans">
+                            {opp.title}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="font-mono font-bold text-readflow-green dark:text-readflow-lightgreen">
+                            +{opp.points}
+                          </span>
+                          <button
+                            id={`del-opp-btn-${opp.id}`}
+                            onClick={() => onDeleteOpportunity(opp.id)}
+                            className="text-sepia-300 hover:text-red-500 p-0.5 rounded hover:bg-cream-100 dark:hover:bg-sepia-800 transition-all cursor-pointer animate-none"
+                            title="Delete opportunity"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </motion.div>
+                    );
+                  })}
+                </AnimatePresence>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>
